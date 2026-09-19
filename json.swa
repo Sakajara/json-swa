@@ -816,3 +816,411 @@ N64 json_ujumbe_wa_kosa(JsonKosa* kosa, N8* bafa, N64 uwezo) {
     bafa[nafasi] = 0;
     rudisha nafasi;
 }
+
+// ==========================================================
+// 3. Kiandikaji (serializer)
+// ==========================================================
+//
+// json_hadi_mfuatano: JSON ya mstari mmoja (compact).
+// json_hadi_mfuatano_mzuri: yenye upangaji (indent) wa nafasi `ndani`
+// kwa kila ngazi. Herufi za UTF-8 zinaandikwa kama zilivyo; herufi
+// za udhibiti (< 0x20) zinatoroshwa. Nambari zilizochanganuliwa
+// zinaandikwa kwa maandishi yake ASILI (hakuna upotevu wa usahihi);
+// nambari zilizojengwa kwa programu zinapangwa kwa tarakimu 15 za maana.
+
+muundo JsonBafa {
+    N8* data;
+    N32 idadi;
+    N32 uwezo;
+    N32 kosa;
+};
+
+JsonBafa* json_bafa_mpya() {
+    JsonBafa* b = tenga(ukubwa(JsonBafa));
+    kama (b == 0) { rudisha 0; }
+    b->uwezo = 256;
+    b->idadi = 0;
+    b->kosa = 0;
+    b->data = tenga(256);
+    kama (b->data == 0) { rudisha 0; }
+    rudisha b;
+}
+
+// Ongeza baiti moja. Daima kunabaki nafasi ya NUL ya mwisho.
+W0 json_bafa_baiti(JsonBafa* b, N32 c) {
+    kama (b->kosa != 0) { rudisha; }
+    kama (b->idadi + 2 >= b->uwezo) {
+        N32 mpya = b->uwezo * 2;
+        N8* nd = tenga(mpya);
+        kama (nd == 0) {
+            b->kosa = 1;
+            rudisha;
+        }
+        nakili(nd, b->data, b->idadi);
+        b->data = nd;
+        b->uwezo = mpya;
+    }
+    b->data[b->idadi] = c;
+    b->idadi = b->idadi + 1;
+}
+
+W0 json_bafa_mfuatano(JsonBafa* b, N8* s) {
+    N32 i = 0;
+    wakati (s[i] != 0) {
+        json_bafa_baiti(b, s[i]);
+        i = i + 1;
+    }
+}
+
+W0 json_bafa_nafasi(JsonBafa* b, N32 idadi) {
+    N32 i = 0;
+    wakati (i < idadi) {
+        json_bafa_baiti(b, 32);
+        i = i + 1;
+    }
+}
+
+// Tarakimu ya heksadesimali ndogo (0..15 -> '0'..'9','a'..'f').
+N32 json_herufi_hex(N32 h) {
+    kama (h < 10) { rudisha 48 + h; }
+    rudisha 87 + h;
+}
+
+// Andika mfuatano kwenye nukuu, ukitorosha inavyohitajika.
+W0 json_andika_herufi(JsonBafa* b, N8* s) {
+    json_bafa_baiti(b, 34);
+    N32 i = 0;
+    wakati (s[i] != 0) {
+        N32 c = s[i];
+        kama (c < 0) { c = c + 256; }
+        kama (c == 34) {
+            json_bafa_baiti(b, 92);
+            json_bafa_baiti(b, 34);
+        } sivyo {
+            kama (c == 92) {
+                json_bafa_baiti(b, 92);
+                json_bafa_baiti(b, 92);
+            } sivyo {
+                kama (c == 8) {
+                    json_bafa_baiti(b, 92);
+                    json_bafa_baiti(b, 98);
+                } sivyo {
+                    kama (c == 12) {
+                        json_bafa_baiti(b, 92);
+                        json_bafa_baiti(b, 102);
+                    } sivyo {
+                        kama (c == 10) {
+                            json_bafa_baiti(b, 92);
+                            json_bafa_baiti(b, 110);
+                        } sivyo {
+                            kama (c == 13) {
+                                json_bafa_baiti(b, 92);
+                                json_bafa_baiti(b, 114);
+                            } sivyo {
+                                kama (c == 9) {
+                                    json_bafa_baiti(b, 92);
+                                    json_bafa_baiti(b, 116);
+                                } sivyo {
+                                    kama (c < 32) {
+                                        json_bafa_baiti(b, 92);
+                                        json_bafa_baiti(b, 117);
+                                        json_bafa_baiti(b, 48);
+                                        json_bafa_baiti(b, 48);
+                                        json_bafa_baiti(b, json_herufi_hex(c / 16));
+                                        json_bafa_baiti(b, json_herufi_hex(c % 16));
+                                    } sivyo {
+                                        json_bafa_baiti(b, c);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    json_bafa_baiti(b, 34);
+}
+
+// Panga nambari ya D64 (tarakimu 15 za maana, sawa na "%.15g"):
+//  * kipeo cha desimali e kati ya -5 na 14 -> nukuu ya kawaida (0.00012, 123.5, 100000)
+//  * vinginevyo -> nukuu ya kisayansi (1.5e+20, 1e-7), halali kwa JSON.
+// Nambari isiyo na mwisho / kubwa kupita 1e300 / NaN -> "null" (kama
+// JSON.stringify ya JavaScript).
+W0 json_andika_d64(JsonBafa* b, D64 x) {
+    D64 a = x;
+    kama (x < 0.0) { a = 0.0 - x; }
+    kama (a > json_p10(300)) {
+        json_bafa_mfuatano(b, "null");
+        rudisha;
+    }
+    kama (a == 0.0) {
+        json_bafa_baiti(b, 48);
+        rudisha;
+    }
+    // Kipeo e: 10^e <= a < 10^(e+1) (makadirio; yanarekebishwa hapa chini).
+    N32 e = 0;
+    D64 p = 1.0;
+    kama (a >= 1.0) {
+        wakati (p * 10.0 <= a && e < 300) {
+            p = p * 10.0;
+            e = e + 1;
+        }
+    } sivyo {
+        wakati (p > a && e > -330) {
+            p = p / 10.0;
+            e = e - 1;
+        }
+    }
+    // Kokotoa m = a / 10^(e-14) kwa mzunguko -- lazima iwe kati ya 1e14
+    // na 1e15 - 1; ikiwa sivyo, kipeo kilikadiriwa vibaya kwa 1, rekebisha.
+    N64 m = 0;
+    N32 jaribio = 0;
+    wakati (jaribio < 4) {
+        N32 k = 14 - e;
+        D64 kipimo = a;
+        kama (k > 200) {
+            kipimo = kipimo * json_p10(200);
+            k = k - 200;
+        }
+        kama (k >= 0) {
+            kipimo = kipimo * json_p10(k);
+        } sivyo {
+            kipimo = kipimo / json_p10(0 - k);
+        }
+        m = kipimo + 0.5;
+        kama (m >= 1000000000000000) {
+            e = e + 1;
+        } sivyo {
+            kama (m < 100000000000000) {
+                e = e - 1;
+            } sivyo {
+                vunja;
+            }
+        }
+        jaribio = jaribio + 1;
+    }
+    kama (m < 100000000000000 || m >= 1000000000000000) {
+        json_bafa_mfuatano(b, "null");
+        rudisha;
+    }
+    kama (x < 0.0) { json_bafa_baiti(b, 45); }
+    // Tarakimu 15 (kutoka muhimu zaidi), kisha ondoa sifuri za mwisho.
+    N8 tar[16];
+    N32 i = 14;
+    N64 mm = m;
+    wakati (i >= 0) {
+        tar[i] = 48 + (mm % 10);
+        mm = mm / 10;
+        i = i - 1;
+    }
+    N32 nd = 15;
+    wakati (nd > 1 && tar[nd - 1] == 48) { nd = nd - 1; }
+    kama (e >= 0 && e < 15) {
+        // Sehemu kamili ina tarakimu e+1.
+        i = 0;
+        wakati (i <= e) {
+            kama (i < nd) {
+                json_bafa_baiti(b, tar[i]);
+            } sivyo {
+                json_bafa_baiti(b, 48);
+            }
+            i = i + 1;
+        }
+        kama (nd > e + 1) {
+            json_bafa_baiti(b, 46);
+            i = e + 1;
+            wakati (i < nd) {
+                json_bafa_baiti(b, tar[i]);
+                i = i + 1;
+            }
+        }
+        rudisha;
+    }
+    kama (e < 0 && e >= -5) {
+        json_bafa_mfuatano(b, "0.");
+        i = 0;
+        wakati (i < (0 - e) - 1) {
+            json_bafa_baiti(b, 48);
+            i = i + 1;
+        }
+        i = 0;
+        wakati (i < nd) {
+            json_bafa_baiti(b, tar[i]);
+            i = i + 1;
+        }
+        rudisha;
+    }
+    // Nukuu ya kisayansi: d[.ddd]e[+-]XX
+    json_bafa_baiti(b, tar[0]);
+    kama (nd > 1) {
+        json_bafa_baiti(b, 46);
+        i = 1;
+        wakati (i < nd) {
+            json_bafa_baiti(b, tar[i]);
+            i = i + 1;
+        }
+    }
+    json_bafa_baiti(b, 101);
+    N32 ae = e;
+    kama (e < 0) {
+        json_bafa_baiti(b, 45);
+        ae = 0 - e;
+    } sivyo {
+        json_bafa_baiti(b, 43);
+    }
+    N8 kt[8];
+    N32 nk = 0;
+    wakati (1 == 1) {
+        kt[nk] = 48 + (ae % 10);
+        nk = nk + 1;
+        ae = ae / 10;
+        kama (ae == 0) { vunja; }
+    }
+    wakati (nk > 0) {
+        nk = nk - 1;
+        json_bafa_baiti(b, kt[nk]);
+    }
+}
+
+W0 json_ongeza_mstari_mpya(JsonBafa* b, N32 ndani, N32 kina) {
+    json_bafa_baiti(b, 10);
+    json_bafa_nafasi(b, ndani * kina);
+}
+
+// Andika thamani `v` kwenye `b`. `ndani` = nafasi kwa kila ngazi (0 =
+// mstari mmoja), `kina` = ngazi ya sasa. Thamani zilizojengwa kwa
+// programu zenye kina > 4096 zinakataliwa (b->kosa) kulinda rafu.
+W0 json_andika_thamani(Json* v, JsonBafa* b, N32 ndani, N32 kina) {
+    kama (kina > 4096) {
+        b->kosa = 1;
+        rudisha;
+    }
+    kama (v->aina == JSON_NULL) {
+        json_bafa_mfuatano(b, "null");
+        rudisha;
+    }
+    kama (v->aina == JSON_BOOL) {
+        kama (v->kweli != 0) {
+            json_bafa_mfuatano(b, "true");
+        } sivyo {
+            json_bafa_mfuatano(b, "false");
+        }
+        rudisha;
+    }
+    kama (v->aina == JSON_NAMBARI) {
+        kama (v->maandishi != 0) {
+            json_bafa_mfuatano(b, v->maandishi);
+        } sivyo {
+            json_andika_d64(b, v->nambari);
+        }
+        rudisha;
+    }
+    kama (v->aina == JSON_MFUATANO) {
+        json_andika_herufi(b, v->maandishi);
+        rudisha;
+    }
+    N32 i = 0;
+    kama (v->aina == JSON_ORODHA) {
+        kama (v->idadi == 0) {
+            json_bafa_mfuatano(b, "[]");
+            rudisha;
+        }
+        json_bafa_baiti(b, 91);
+        wakati (i < v->idadi) {
+            kama (i > 0) { json_bafa_baiti(b, 44); }
+            kama (ndani > 0) { json_ongeza_mstari_mpya(b, ndani, kina + 1); }
+            json_andika_thamani(v->vipengele[i], b, ndani, kina + 1);
+            i = i + 1;
+        }
+        kama (ndani > 0) { json_ongeza_mstari_mpya(b, ndani, kina); }
+        json_bafa_baiti(b, 93);
+        rudisha;
+    }
+    // JSON_KITU
+    kama (v->idadi == 0) {
+        json_bafa_mfuatano(b, "{}");
+        rudisha;
+    }
+    json_bafa_baiti(b, 123);
+    wakati (i < v->idadi) {
+        kama (i > 0) { json_bafa_baiti(b, 44); }
+        kama (ndani > 0) { json_ongeza_mstari_mpya(b, ndani, kina + 1); }
+        json_andika_herufi(b, v->funguo[i]);
+        json_bafa_baiti(b, 58);
+        kama (ndani > 0) { json_bafa_baiti(b, 32); }
+        json_andika_thamani(v->vipengele[i], b, ndani, kina + 1);
+        i = i + 1;
+    }
+    kama (ndani > 0) { json_ongeza_mstari_mpya(b, ndani, kina); }
+    json_bafa_baiti(b, 125);
+}
+
+// JSON yenye upangaji: `ndani` nafasi kwa kila ngazi (mf. 2). Inarudisha
+// mfuatano unaoishia kwa NUL, au 0 kumbukumbu ikiisha / kina kikizidi.
+N8* json_hadi_mfuatano_mzuri(Json* v, N32 ndani) {
+    JsonBafa* b = json_bafa_mpya();
+    kama (b == 0) { rudisha 0; }
+    json_andika_thamani(v, b, ndani, 0);
+    kama (b->kosa != 0) { rudisha 0; }
+    b->data[b->idadi] = 0;
+    rudisha b->data;
+}
+
+// JSON ya mstari mmoja (compact).
+N8* json_hadi_mfuatano(Json* v) {
+    rudisha json_hadi_mfuatano_mzuri(v, 0);
+}
+
+// Sahau maandishi asili ya nambari zote (ili ziandikwe upya kutoka
+// kwenye thamani ya D64). Inatumika hasa kupima usahihi wa D64.
+W0 json_sahau_maandishi_asili(Json* v) {
+    kama (v->aina == JSON_NAMBARI) {
+        v->maandishi = 0;
+        rudisha;
+    }
+    kama (v->aina == JSON_ORODHA || v->aina == JSON_KITU) {
+        N32 i = 0;
+        wakati (i < v->idadi) {
+            json_sahau_maandishi_asili(v->vipengele[i]);
+            i = i + 1;
+        }
+    }
+}
+
+// Ulinganifu wa kina: thamani mbili zinawakilisha JSON ile ile?
+// (Vitu ni sawa bila kujali mpangilio wa funguo; nambari zinalinganishwa
+// kwa thamani ya D64.) Inarudisha 1/0.
+N32 json_sawa(Json* a, Json* b) {
+    kama (a->aina != b->aina) { rudisha 0; }
+    kama (a->aina == JSON_NULL) { rudisha 1; }
+    kama (a->aina == JSON_BOOL) {
+        kama (a->kweli == b->kweli) { rudisha 1; }
+        rudisha 0;
+    }
+    kama (a->aina == JSON_NAMBARI) {
+        kama (a->nambari == b->nambari) { rudisha 1; }
+        rudisha 0;
+    }
+    kama (a->aina == JSON_MFUATANO) {
+        kama (linganisha_mfuatano(a->maandishi, b->maandishi) == 0) { rudisha 1; }
+        rudisha 0;
+    }
+    kama (a->idadi != b->idadi) { rudisha 0; }
+    N32 i = 0;
+    kama (a->aina == JSON_ORODHA) {
+        wakati (i < a->idadi) {
+            kama (json_sawa(a->vipengele[i], b->vipengele[i]) == 0) { rudisha 0; }
+            i = i + 1;
+        }
+        rudisha 1;
+    }
+    wakati (i < a->idadi) {
+        Json* mwenzake = json_pata(b, a->funguo[i]);
+        kama (mwenzake == 0) { rudisha 0; }
+        kama (json_sawa(a->vipengele[i], mwenzake) == 0) { rudisha 0; }
+        i = i + 1;
+    }
+    rudisha 1;
+}
