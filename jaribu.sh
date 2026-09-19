@@ -9,6 +9,9 @@ KIONGOZI="$(cd "$(dirname "$0")" && pwd)"
 cd "$KIONGOZI" || exit 1
 mkdir -p .jenga
 if [ $# -gt 0 ]; then MAJARIBIO=("$@"); else MAJARIBIO=(jaribio/jaribio_*.swa); fi
+# Kila jaribio lina kikomo cha muda (kuning'inia = kushindwa, si kusubiri milele).
+LIMIT=""
+command -v timeout > /dev/null 2>&1 && LIMIT="timeout ${JARIBIO_MUDA:-300}"
 FAULU=0; SHINDWA=0
 for j in "${MAJARIBIO[@]}"; do
     jina="$(basename "$j" .swa)"
@@ -16,10 +19,10 @@ for j in "${MAJARIBIO[@]}"; do
     if ! ./jenga.sh ".jenga/$jina.kamili.swa" ".jenga/$jina" 2> ".jenga/$jina.jenga.log"; then
         echo "SHINDWA (kukusanya): $jina"; cat ".jenga/$jina.jenga.log"; SHINDWA=$((SHINDWA+1)); continue
     fi
-    if ".jenga/$jina" > ".jenga/$jina.towe" 2>&1; then
+    if $LIMIT ".jenga/$jina" > ".jenga/$jina.towe" 2>&1; then
         echo "imefaulu: $jina  ($(tail -1 ".jenga/$jina.towe"))"; FAULU=$((FAULU+1))
     else
-        echo "SHINDWA: $jina"; cat ".jenga/$jina.towe"; SHINDWA=$((SHINDWA+1))
+        echo "SHINDWA: $jina (msimbo $?)"; cat ".jenga/$jina.towe"; SHINDWA=$((SHINDWA+1))
     fi
 done
 echo "=== majaribio: $FAULU yamefaulu, $SHINDWA yameshindwa ==="
