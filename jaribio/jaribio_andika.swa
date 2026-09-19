@@ -1,0 +1,128 @@
+// jaribio_andika.swa -- kiandikaji: compact, pretty, escape, nambari.
+
+// Changanua `ingizo` kisha liandike compact na ulinganishe.
+W0 dhibitisha_compact(N8* ingizo, N8* tarajiwa, N8* jina) {
+    JsonKosa kosa;
+    Json* v = json_changanua(ingizo, &kosa);
+    thibitisha_si_tupu(v, jina);
+    kama (v != 0) {
+        thibitisha_mfuatano(json_hadi_mfuatano(v), tarajiwa, jina);
+    }
+}
+
+// Panga nambari iliyojengwa (bila maandishi asili).
+W0 dhibitisha_nambari(D64 x, N8* tarajiwa, N8* jina) {
+    Json* n = json_nambari(x);
+    thibitisha_mfuatano(json_hadi_mfuatano(n), tarajiwa, jina);
+}
+
+N32 main() {
+    // ---- Compact: aina zote ----
+    dhibitisha_compact("null", "null", "compact: null");
+    dhibitisha_compact(" true ", "true", "compact: true");
+    dhibitisha_compact("false", "false", "compact: false");
+    dhibitisha_compact("[]", "[]", "compact: orodha tupu");
+    dhibitisha_compact("{ }", "{}", "compact: kitu tupu");
+    dhibitisha_compact("[ 1 , 2 ,\n 3 ]", "[1,2,3]", "compact: nafasi zinaondolewa");
+    dhibitisha_compact("{ \"a\" : 1 , \"b\" : [ true , null ] }", "{\"a\":1,\"b\":[true,null]}", "compact: kitu na orodha");
+    dhibitisha_compact("{\"z\":1,\"a\":2}", "{\"z\":1,\"a\":2}", "compact: mpangilio wa funguo unabaki");
+    dhibitisha_compact("{\"x\":1,\"y\":2,\"x\":3}", "{\"x\":3,\"y\":2}", "compact: ufunguo unaorudiwa");
+    dhibitisha_compact("[[[]],{\"a\":{}}]", "[[[]],{\"a\":{}}]", "compact: nesting wa tupu");
+
+    // Nambari zilizochanganuliwa zinabaki kwa maandishi asili.
+    dhibitisha_compact("[1.50, 1E3, -0, 0.10, 12345678901234567890, 1e-7]",
+                       "[1.50,1E3,-0,0.10,12345678901234567890,1e-7]", "compact: maandishi asili ya nambari");
+
+    // ---- Escape kwenye towe ----
+    dhibitisha_compact("\"a\\\"b\\\\c\\/d\\be\\ff\\ng\\rh\\ti\"", "\"a\\\"b\\\\c/d\\be\\ff\\ng\\rh\\ti\"", "escape: \\/ inakuwa /");
+    // (Swa haina \xNN kwenye herufi halisi -- baiti zinatengenezwa kwa mkono.)
+    // Towe la "\u0001\u001f\u007f": udhibiti unakuwa \u00XX, DEL (0x7f) inabaki ghafi.
+    N8 e1[24];
+    N32 k = 0;
+    e1[k] = 34; k = k + 1;
+    e1[k] = 92; k = k + 1; e1[k] = 117; k = k + 1; e1[k] = 48; k = k + 1; e1[k] = 48; k = k + 1; e1[k] = 48; k = k + 1; e1[k] = 49; k = k + 1;
+    e1[k] = 92; k = k + 1; e1[k] = 117; k = k + 1; e1[k] = 48; k = k + 1; e1[k] = 48; k = k + 1; e1[k] = 49; k = k + 1; e1[k] = 102; k = k + 1;
+    e1[k] = 127; k = k + 1;
+    e1[k] = 34; k = k + 1;
+    e1[k] = 0;
+    dhibitisha_compact("\"\\u0001\\u001f\\u007f\"", e1, "escape: udhibiti unakuwa \\u00XX (DEL inabaki ghafi)");
+    // Towe la "\u0041\u00e9\u20AC": UTF-8 ghafi = A, C3 A9, E2 82 AC.
+    N8 e2[16];
+    e2[0] = 34; e2[1] = 65; e2[2] = 195; e2[3] = 169; e2[4] = 226; e2[5] = 130; e2[6] = 172; e2[7] = 34; e2[8] = 0;
+    dhibitisha_compact("\"\\u0041\\u00e9\\u20AC\"", e2, "unicode: UTF-8 ghafi kwenye towe");
+
+    // ---- Nambari zilizojengwa: uundaji wa D64 ----
+    dhibitisha_nambari(0.0, "0", "d64: 0");
+    dhibitisha_nambari(1.0, "1", "d64: 1");
+    dhibitisha_nambari(-1.0, "-1", "d64: -1");
+    dhibitisha_nambari(42.0, "42", "d64: 42");
+    dhibitisha_nambari(0.5, "0.5", "d64: 0.5");
+    dhibitisha_nambari(-0.25, "-0.25", "d64: -0.25");
+    dhibitisha_nambari(0.1, "0.1", "d64: 0.1");
+    dhibitisha_nambari(0.3, "0.3", "d64: 0.3");
+    dhibitisha_nambari(123.456, "123.456", "d64: 123.456");
+    dhibitisha_nambari(2.675, "2.675", "d64: 2.675 (mzunguko sahihi)");
+    dhibitisha_nambari(100000.0, "100000", "d64: 100000");
+    dhibitisha_nambari(123456789.0, "123456789", "d64: 123456789");
+    dhibitisha_nambari(999999999999999.0, "999999999999999", "d64: 15 tarakimu kamili");
+    dhibitisha_nambari(1000000000000000.0, "1e+15", "d64: 1e15 -> kisayansi");
+    dhibitisha_nambari(0.0001, "0.0001", "d64: 0.0001");
+    dhibitisha_nambari(0.00001, "0.00001", "d64: 1e-5 bado kawaida");
+    dhibitisha_nambari(1.5 / 1000000.0, "1.5e-6", "d64: 1.5e-6 -> kisayansi");
+    dhibitisha_nambari(3.0 / 1000000000.0, "3e-9", "d64: 3e-9");
+    dhibitisha_nambari(1.0 / 3.0, "0.333333333333333", "d64: 1/3 (tarakimu 15)");
+    dhibitisha_nambari(2.0 / 3.0, "0.666666666666667", "d64: 2/3 (imezungushwa)");
+    dhibitisha_nambari(1.0 / 7.0, "0.142857142857143", "d64: 1/7");
+    dhibitisha_nambari(json_p10(20), "1e+20", "d64: 1e20");
+    dhibitisha_nambari(json_p10(22) * 1.5, "1.5e+22", "d64: 1.5e22");
+    dhibitisha_nambari(0.0 - json_p10(10), "-10000000000", "d64: -1e10");
+    dhibitisha_nambari(json_p10(400), "null", "d64: isiyo na mwisho -> null");
+    dhibitisha_nambari(0.0 - json_p10(400), "null", "d64: hasi isiyo na mwisho -> null");
+
+    // ---- Pretty ----
+    JsonKosa kosa;
+    Json* v = json_changanua("{\"a\":1,\"b\":[true,null,{\"c\":\"x\"}],\"d\":{},\"e\":[]}", &kosa);
+    thibitisha_mfuatano(json_hadi_mfuatano_mzuri(v, 2),
+        "{\n  \"a\": 1,\n  \"b\": [\n    true,\n    null,\n    {\n      \"c\": \"x\"\n    }\n  ],\n  \"d\": {},\n  \"e\": []\n}",
+        "pretty: ndani 2");
+    Json* w = json_changanua("[1,[2,3]]", &kosa);
+    thibitisha_mfuatano(json_hadi_mfuatano_mzuri(w, 4), "[\n    1,\n    [\n        2,\n        3\n    ]\n]", "pretty: ndani 4");
+    Json* tupu = json_changanua("[]", &kosa);
+    thibitisha_mfuatano(json_hadi_mfuatano_mzuri(tupu, 2), "[]", "pretty: orodha tupu");
+
+    // ---- Kujenga thamani kwa programu kisha kuiandika ----
+    Json* kitu = json_kitu();
+    json_kitu_weka(kitu, "jina", json_mfuatano("Juma \"J\""));
+    json_kitu_weka(kitu, "umri", json_nambari(30.0));
+    json_kitu_weka(kitu, "hai", json_bool(1));
+    json_kitu_weka(kitu, "mke", json_null());
+    Json* orodha = json_orodha();
+    json_orodha_ongeza(orodha, json_nambari(1.5));
+    json_orodha_ongeza(orodha, json_mfuatano("a\nb"));
+    json_kitu_weka(kitu, "vitu", orodha);
+    thibitisha_mfuatano(json_hadi_mfuatano(kitu),
+        "{\"jina\":\"Juma \\\"J\\\"\",\"umri\":30,\"hai\":true,\"mke\":null,\"vitu\":[1.5,\"a\\nb\"]}",
+        "kujenga: kitu kilichojengwa kwa programu");
+
+    // ---- Kina kirefu cha kuandika (512) ----
+    N8* kina = tenga(4096);
+    N32 i = 0;
+    wakati (i < 512) { kina[i] = 91; i = i + 1; }
+    wakati (i < 1024) { kina[i] = 93; i = i + 1; }
+    kina[1024] = 0;
+    Json* dk = json_changanua(kina, &kosa);
+    thibitisha_mfuatano(json_hadi_mfuatano(dk), kina, "kina 512: andika tena sawa");
+
+    // ---- Bafa kubwa: mfuatano mrefu unakuza bafa ----
+    N8* refu = tenga(20000);
+    i = 0;
+    refu[0] = 34;
+    wakati (i < 15000) { refu[i + 1] = 97 + (i % 26); i = i + 1; }
+    refu[15001] = 34;
+    refu[15002] = 0;
+    Json* jr = json_changanua(refu, &kosa);
+    thibitisha_si_tupu(jr, "mfuatano mrefu: umechanganuliwa");
+    thibitisha_mfuatano(json_hadi_mfuatano(jr), refu, "mfuatano mrefu (15000): andika tena sawa");
+
+    rudisha jaribio_mwisho();
+}
