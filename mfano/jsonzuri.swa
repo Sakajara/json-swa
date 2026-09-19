@@ -1,0 +1,71 @@
+// jsonzuri.swa -- zana ya mstari-wa-amri: soma JSON kutoka stdin,
+// ithibitishe, kisha iandike tena kwenye stdout.
+//
+//   jsonzuri        -> JSON ya mstari mmoja (compact)
+//   jsonzuri -m     -> JSON yenye upangaji (nafasi 2 kwa ngazi)
+//   jsonzuri -h     -> nambari zote zinaandikwa upya kutoka kwenye thamani
+//                      ya D64 (badala ya maandishi asili) -- inatumika
+//                      kupima usahihi wa kusoma/kuandika D64
+//
+// Msimbo wa kutoka: 0 = sawa; 1 = JSON si sahihi (ujumbe kwenye stderr).
+// Ujenzi: SWA=/njia/ya/swa ./jenga.sh mfano/jsonzuri.swa jsonzuri
+
+// Soma stdin yote kwenye bafa inayokua; rudisha bafa (inaishia kwa NUL)
+// na urefu kwenye *urefu.
+N8* zuri_soma_yote(N32* urefu) {
+    N32 uwezo = 65536;
+    N8* bafa = tenga(uwezo);
+    N32 n = 0;
+    wakati (1 == 1) {
+        kama (n + 2 >= uwezo) {
+            N32 mpya = uwezo * 2;
+            N8* nb = tenga(mpya);
+            nakili(nb, bafa, n);
+            bafa = nb;
+            uwezo = mpya;
+        }
+        N64 r = sys_soma(0, bafa + n, uwezo - n - 1);
+        kama (r <= 0) { vunja; }
+        n = n + r;
+    }
+    bafa[n] = 0;
+    *urefu = n;
+    rudisha bafa;
+}
+
+N32 main(N32 argc, N8** argv) {
+    N32 mzuri = 0;
+    N32 hesabu_upya = 0;
+    N32 i = 1;
+    wakati (i < argc) {
+        N8* a = argv[i];
+        kama (a[0] == 45 && a[1] == 109) { mzuri = 1; }
+        kama (a[0] == 45 && a[1] == 104) { hesabu_upya = 1; }
+        i = i + 1;
+    }
+
+    N32 urefu = 0;
+    N8* ingizo = zuri_soma_yote(&urefu);
+    JsonKosa kosa;
+    Json* v = json_changanua_n(ingizo, urefu, &kosa);
+    kama (v == 0) {
+        N8 ujumbe[512];
+        json_ujumbe_wa_kosa(&kosa, ujumbe, 512);
+        andika_stderr("%s\n", ujumbe, 0, 0, 0, 0, 0);
+        rudisha 1;
+    }
+    kama (hesabu_upya == 1) { json_sahau_maandishi_asili(v); }
+    N8* towe = 0;
+    kama (mzuri == 1) {
+        towe = json_hadi_mfuatano_mzuri(v, 2);
+    } sivyo {
+        towe = json_hadi_mfuatano(v);
+    }
+    kama (towe == 0) {
+        andika_stderr("kosa: imeshindwa kuandika JSON (kumbukumbu au kina)\n", 0, 0, 0, 0, 0, 0);
+        rudisha 1;
+    }
+    sys_andika(1, towe, urefu_wa_mfuatano(towe));
+    sys_andika(1, "\n", 1);
+    rudisha 0;
+}

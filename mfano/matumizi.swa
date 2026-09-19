@@ -1,0 +1,28 @@
+// matumizi.swa -- mfano mdogo wa kutumia maktaba ya json.swa:
+// changanua JSON, soma sehemu zake, jenga JSON mpya, kisha iandike.
+//
+// Ujenzi: SWA=/njia/ya/swa ./jenga.sh mfano/matumizi.swa matumizi
+
+N32 main() {
+    // 1. Changanua maandishi ya JSON.
+    JsonKosa kosa;
+    Json* v = json_changanua("{\"jina\": \"Amina\", \"umri\": 27, \"lugha\": [\"Kiswahili\", \"Swa\"]}", &kosa);
+    kama (v == 0) {
+        N8 ujumbe[512];
+        json_ujumbe_wa_kosa(&kosa, ujumbe, 512);
+        andika_stderr("%s\n", ujumbe, 0, 0, 0, 0, 0);
+        rudisha 1;
+    }
+
+    // 2. Soma sehemu.
+    andika("jina  = %s\n", json_thamani_mfuatano(json_pata(v, "jina")), 0, 0, 0, 0, 0);
+    N32 umri = json_thamani_nambari(json_pata(v, "umri"));
+    andika("umri  = %d\n", umri, 0, 0, 0, 0, 0);
+    Json* lugha = json_pata(v, "lugha");
+    andika("lugha = %d (kwanza: %s)\n", json_urefu(lugha), json_thamani_mfuatano(json_kipengele(lugha, 0)), 0, 0, 0);
+
+    // 3. Ongeza sehemu mpya na uandike kwa upangaji mzuri.
+    json_kitu_weka(v, "mwanafunzi", json_bool(1));
+    andika("%s\n", json_hadi_mfuatano_mzuri(v, 2), 0, 0, 0, 0, 0);
+    rudisha 0;
+}
