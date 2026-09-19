@@ -1,0 +1,35 @@
+name: CI
+
+# Majaribio yote (kitengo, mkusanyiko wa RFC 8259, fuzz) dhidi ya mkusanyaji
+# wa Swa wa toleo la sasa la lugha-swa/swa (main). Mnyororo wa kujenga
+# mkusanyaji unahitaji bash na cmp tu -- hakuna lugha nyingine.
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 5 * * 1"   # kila Jumatatu: gundua mapema kama mkusanyaji umevunja kitu
+
+jobs:
+  majaribio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pata mkusanyaji wa Swa
+        run: git clone --depth 1 https://github.com/lugha-swa/swa.git "$RUNNER_TEMP/swa"
+
+      - name: Toleo la mkusanyaji
+        run: git -C "$RUNNER_TEMP/swa" log -1 --format='lugha-swa/swa @ %h (%cd)' --date=short
+
+      - name: Majaribio yote
+        run: SWA="$RUNNER_TEMP/swa" ./jaribu.sh
+
+      - name: Mfano wa matumizi unajengwa na kuendeshwa
+        run: |
+          SWA="$RUNNER_TEMP/swa" ./jenga.sh mfano/matumizi.swa .jenga/matumizi
+          .jenga/matumizi
+
+      - name: Fuzz ya ziada (mbegu tofauti, kesi nyingi)
+        run: |
+          .jenga/jaribio_fuzz 424242 20000
+          .jenga/jaribio_fuzz 987654321 20000
