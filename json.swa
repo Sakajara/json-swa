@@ -235,3 +235,584 @@ N8* json_thamani_mfuatano(Json* v) {
     kama (v->aina != JSON_MFUATANO) { rudisha 0; }
     rudisha v->maandishi;
 }
+
+// ==========================================================
+// 2. Kichanganuzi (parser) -- recursive descent, sarufi kamili ya JSON
+// ==========================================================
+//
+// Inakubali JSON kamili ya RFC 8259 kwa vikwazo vilivyoorodheshwa
+// kwenye README (hakuna \u0000, hakuna surrogate isiyo na jozi,
+// hakuna uthibitisho wa UTF-8 -- baiti za >= 0x80 zinapita kama zilivyo).
+// Kila kosa linaripoti nafasi, mstari na safu.
+
+muundo JsonKosa {
+    N32 msimbo;    // 0 = hakuna kosa, 1 = kuna kosa
+    N32 nafasi;    // nafasi ya baiti (kuanzia 0)
+    N32 mstari;    // mstari (kuanzia 1)
+    N32 safu;      // safu kwa baiti (kuanzia 1)
+    N8* ujumbe;    // maelezo ya kosa
+};
+
+muundo JsonKichanganuzi {
+    N8* chanzo;
+    N32 urefu;
+    N32 nafasi;
+    N32 kina;
+    JsonKosa* kosa;
+};
+
+// Andika kosa la kwanza tu (makosa yanayofuata yanapuuzwa) pamoja na
+// mstari/safu ya nafasi ya sasa. Mtumiaji anarudisha 0 mwenyewe.
+W0 json_kosa(JsonKichanganuzi* p, N8* ujumbe) {
+    JsonKosa* k = p->kosa;
+    kama (k->msimbo != 0) { rudisha; }
+    k->msimbo = 1;
+    k->nafasi = p->nafasi;
+    k->ujumbe = ujumbe;
+    N32 mstari = 1;
+    N32 safu = 1;
+    N32 i = 0;
+    wakati (i < p->nafasi && i < p->urefu) {
+        kama (p->chanzo[i] == 10) {
+            mstari = mstari + 1;
+            safu = 1;
+        } sivyo {
+            safu = safu + 1;
+        }
+        i = i + 1;
+    }
+    k->mstari = mstari;
+    k->safu = safu;
+}
+
+// Baiti kwenye nafasi `i` kama nambari 0..255 (N8 ya Swa ina ishara:
+// baiti >= 0x80 ingesomwa kama hasi); -1 ikiwa nje ya chanzo.
+N32 json_bayti_kwa(JsonKichanganuzi* p, N32 i) {
+    kama (i < 0 || i >= p->urefu) { rudisha -1; }
+    N32 c = p->chanzo[i];
+    kama (c < 0) { c = c + 256; }
+    rudisha c;
+}
+
+// Baiti ya sasa (au -1 mwishoni mwa chanzo).
+N32 json_sasa(JsonKichanganuzi* p) {
+    rudisha json_bayti_kwa(p, p->nafasi);
+}
+
+W0 json_songa(JsonKichanganuzi* p) {
+    p->nafasi = p->nafasi + 1;
+}
+
+// Ruka nafasi tupu za JSON: space, tab, LF, CR.
+W0 json_ruka_nafasi(JsonKichanganuzi* p) {
+    wakati (1 == 1) {
+        N32 c = json_sasa(p);
+        kama (c == 32 || c == 9 || c == 10 || c == 13) {
+            p->nafasi = p->nafasi + 1;
+        } sivyo {
+            vunja;
+        }
+    }
+}
+
+// Linganisha neno la ASCII (true/false/null) kwenye nafasi ya sasa;
+// ikilingana, songa mbele na rudisha 1.
+N32 json_neno(JsonKichanganuzi* p, N8* neno) {
+    N32 n = urefu_wa_mfuatano(neno);
+    kama (p->nafasi + n > p->urefu) { rudisha 0; }
+    N32 i = 0;
+    wakati (i < n) {
+        kama (p->chanzo[p->nafasi + i] != neno[i]) { rudisha 0; }
+        i = i + 1;
+    }
+    p->nafasi = p->nafasi + n;
+    rudisha 1;
+}
+
+// Thamani ya tarakimu ya heksadesimali, au -1.
+N32 json_hex(N32 c) {
+    kama (c >= 48 && c <= 57) { rudisha c - 48; }
+    kama (c >= 97 && c <= 102) { rudisha c - 87; }
+    kama (c >= 65 && c <= 70) { rudisha c - 55; }
+    rudisha -1;
+}
+
+// Soma tarakimu 4 za heksadesimali kuanzia `kuanzia` (zote lazima ziwe
+// kabla ya `kikomo`); rudisha thamani (0..65535) au -1.
+N32 json_hex4(JsonKichanganuzi* p, N32 kuanzia, N32 kikomo) {
+    kama (kuanzia + 4 > kikomo) { rudisha -1; }
+    N32 thamani = 0;
+    N32 i = 0;
+    wakati (i < 4) {
+        N32 h = json_hex(json_bayti_kwa(p, kuanzia + i));
+        kama (h < 0) { rudisha -1; }
+        thamani = thamani * 16 + h;
+        i = i + 1;
+    }
+    rudisha thamani;
+}
+
+// Andika alama ya Unicode `cp` kama baiti za UTF-8 kwenye r[w..];
+// rudisha nafasi mpya ya kuandika.
+N32 json_weka_utf8(N8* r, N32 w, N32 cp) {
+    kama (cp < 128) {
+        r[w] = cp;
+        rudisha w + 1;
+    }
+    kama (cp < 2048) {
+        r[w] = 192 + (cp / 64);
+        r[w + 1] = 128 + (cp % 64);
+        rudisha w + 2;
+    }
+    kama (cp < 65536) {
+        r[w] = 224 + (cp / 4096);
+        r[w + 1] = 128 + ((cp / 64) % 64);
+        r[w + 2] = 128 + (cp % 64);
+        rudisha w + 3;
+    }
+    r[w] = 240 + (cp / 262144);
+    r[w + 1] = 128 + ((cp / 4096) % 64);
+    r[w + 2] = 128 + ((cp / 64) % 64);
+    r[w + 3] = 128 + (cp % 64);
+    rudisha w + 4;
+}
+
+// Changanua mfuatano wa JSON; nafasi ya sasa ni '"' ya kufungua.
+// Inarudisha mfuatano uliosimbuliwa (unaoishia kwa NUL) au 0 kwa kosa.
+N8* json_changanua_herufi(JsonKichanganuzi* p) {
+    p->nafasi = p->nafasi + 1;
+    N32 mwanzo = p->nafasi;
+
+    // Pita ya 1: tafuta '"' ya kufunga; kataa herufi za udhibiti.
+    N32 i = mwanzo;
+    wakati (1 == 1) {
+        kama (i >= p->urefu) {
+            p->nafasi = p->urefu;
+            json_kosa(p, "mfuatano haujafungwa (\" ya kufunga inakosekana)");
+            rudisha 0;
+        }
+        N32 c = json_bayti_kwa(p, i);
+        kama (c == 34) { vunja; }
+        kama (c < 32) {
+            p->nafasi = i;
+            json_kosa(p, "herufi ya udhibiti (< 0x20) ndani ya mfuatano lazima iandikwe kwa \\u....");
+            rudisha 0;
+        }
+        kama (c == 92) {
+            i = i + 2;
+        } sivyo {
+            i = i + 1;
+        }
+    }
+    N32 kiwango = i;
+
+    // Pita ya 2: simbua. Urefu uliosimbuliwa ni <= urefu wa asili.
+    N8* r = tenga(kiwango - mwanzo + 1);
+    kama (r == 0) {
+        json_kosa(p, "kumbukumbu imeisha");
+        rudisha 0;
+    }
+    N32 w = 0;
+    N32 j = mwanzo;
+    wakati (j < kiwango) {
+        N32 c = json_bayti_kwa(p, j);
+        kama (c != 92) {
+            r[w] = c;
+            w = w + 1;
+            j = j + 1;
+            endelea;
+        }
+        j = j + 1;
+        N32 e = json_bayti_kwa(p, j);
+        kama (j >= kiwango) { e = -1; }
+        kama (e == 34) { r[w] = 34; w = w + 1; j = j + 1; endelea; }
+        kama (e == 92) { r[w] = 92; w = w + 1; j = j + 1; endelea; }
+        kama (e == 47) { r[w] = 47; w = w + 1; j = j + 1; endelea; }
+        kama (e == 98) { r[w] = 8; w = w + 1; j = j + 1; endelea; }
+        kama (e == 102) { r[w] = 12; w = w + 1; j = j + 1; endelea; }
+        kama (e == 110) { r[w] = 10; w = w + 1; j = j + 1; endelea; }
+        kama (e == 114) { r[w] = 13; w = w + 1; j = j + 1; endelea; }
+        kama (e == 116) { r[w] = 9; w = w + 1; j = j + 1; endelea; }
+        kama (e != 117) {
+            p->nafasi = j;
+            json_kosa(p, "mfuatano wa kutoroka (escape) usio sahihi baada ya \\");
+            rudisha 0;
+        }
+        // \uXXXX
+        N32 cp = json_hex4(p, j + 1, kiwango);
+        kama (cp < 0) {
+            p->nafasi = j;
+            json_kosa(p, "\\u lazima ifuatwe na tarakimu 4 za heksadesimali");
+            rudisha 0;
+        }
+        j = j + 5;
+        kama (cp >= 55296 && cp <= 56319) {
+            // surrogate ya juu -- lazima ifuatwe na \uDC00..\uDFFF
+            N32 chini = -1;
+            kama (json_bayti_kwa(p, j) == 92 && json_bayti_kwa(p, j + 1) == 117) {
+                chini = json_hex4(p, j + 2, kiwango);
+            }
+            kama (chini < 56320 || chini > 57343) {
+                p->nafasi = j;
+                json_kosa(p, "surrogate ya juu ya UTF-16 (\\uD800..\\uDBFF) haina jozi ya chini (\\uDC00..\\uDFFF)");
+                rudisha 0;
+            }
+            cp = 65536 + ((cp - 55296) * 1024) + (chini - 56320);
+            j = j + 6;
+        } sivyo {
+            kama (cp >= 56320 && cp <= 57343) {
+                p->nafasi = j - 5;
+                json_kosa(p, "surrogate ya chini ya UTF-16 (\\uDC00..\\uDFFF) haina jozi ya juu");
+                rudisha 0;
+            }
+        }
+        kama (cp == 0) {
+            p->nafasi = j - 5;
+            json_kosa(p, "\\u0000 haikubaliwi (mfuatano wa Swa unaishia kwa NUL)");
+            rudisha 0;
+        }
+        w = json_weka_utf8(r, w, cp);
+    }
+    r[w] = 0;
+    p->nafasi = kiwango + 1;
+    rudisha r;
+}
+
+// 10^k kama D64 (k kati ya 0 na 400; zaidi ya 308 inakuwa isiyo na mwisho).
+D64 json_p10(N32 k) {
+    D64 p = 1.0;
+    N32 i = 0;
+    kama (k > 400) { k = 400; }
+    wakati (i < k) {
+        p = p * 10.0;
+        i = i + 1;
+    }
+    rudisha p;
+}
+
+// Thamani ya D64 ya maandishi ya nambari ya JSON YALIYOTHIBITISHWA tayari
+// kuwa sahihi. Mantissa inakusanywa kwenye N64 (tarakimu 18 za maana),
+// kisha inazidishwa/kugawanywa kwa 10^kipeo -- sahihi kabisa kwa nambari
+// zenye hadi tarakimu 15 na kipeo cha desimali kati ya -22 na 22; kwa
+// nyingine kuna tofauti ndogo ya mzunguko (maandishi asili yanabaki
+// kwenye Json.maandishi na ndiyo yanayoandikwa tena).
+D64 json_thamani_ya_nambari(N8* s) {
+    N32 i = 0;
+    N32 hasi = 0;
+    kama (s[i] == 45) {
+        hasi = 1;
+        i = i + 1;
+    }
+    N64 mant = 0;
+    N32 tarakimu = 0;
+    N32 kipeo = 0;
+    wakati (s[i] >= 48 && s[i] <= 57) {
+        N32 d = s[i] - 48;
+        kama (tarakimu < 18) {
+            mant = mant * 10 + d;
+            kama (mant > 0) { tarakimu = tarakimu + 1; }
+        } sivyo {
+            kipeo = kipeo + 1;
+        }
+        i = i + 1;
+    }
+    kama (s[i] == 46) {
+        i = i + 1;
+        wakati (s[i] >= 48 && s[i] <= 57) {
+            N32 d = s[i] - 48;
+            kama (tarakimu < 18) {
+                mant = mant * 10 + d;
+                kipeo = kipeo - 1;
+                kama (mant > 0) { tarakimu = tarakimu + 1; }
+            }
+            i = i + 1;
+        }
+    }
+    kama (s[i] == 101 || s[i] == 69) {
+        i = i + 1;
+        N32 ehasi = 0;
+        kama (s[i] == 45) {
+            ehasi = 1;
+            i = i + 1;
+        } sivyo {
+            kama (s[i] == 43) { i = i + 1; }
+        }
+        N32 e = 0;
+        wakati (s[i] >= 48 && s[i] <= 57) {
+            kama (e < 100000) { e = e * 10 + (s[i] - 48); }
+            i = i + 1;
+        }
+        kama (ehasi == 1) {
+            kipeo = kipeo - e;
+        } sivyo {
+            kipeo = kipeo + e;
+        }
+    }
+    kama (mant == 0) { rudisha 0.0; }
+    D64 x = mant;
+    kama (kipeo > 0) {
+        x = x * json_p10(kipeo);
+    }
+    kama (kipeo < 0) {
+        x = x / json_p10(0 - kipeo);
+    }
+    kama (hasi == 1) { x = 0.0 - x; }
+    rudisha x;
+}
+
+// Changanua nambari kwa sarufi kali: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
+Json* json_changanua_nambari(JsonKichanganuzi* p) {
+    N32 mwanzo = p->nafasi;
+    N32 c = json_sasa(p);
+    kama (c == 45) {
+        p->nafasi = p->nafasi + 1;
+        c = json_sasa(p);
+    }
+    kama (c == 48) {
+        p->nafasi = p->nafasi + 1;
+        c = json_sasa(p);
+        kama (c >= 48 && c <= 57) {
+            json_kosa(p, "sifuri ya mwanzo hairuhusiwi kwenye nambari");
+            rudisha 0;
+        }
+    } sivyo {
+        kama (c >= 49 && c <= 57) {
+            wakati (c >= 48 && c <= 57) {
+                p->nafasi = p->nafasi + 1;
+                c = json_sasa(p);
+            }
+        } sivyo {
+            json_kosa(p, "tarakimu inatarajiwa kwenye nambari");
+            rudisha 0;
+        }
+    }
+    kama (c == 46) {
+        p->nafasi = p->nafasi + 1;
+        c = json_sasa(p);
+        kama (c < 48 || c > 57) {
+            json_kosa(p, "tarakimu inatarajiwa baada ya nukta ya desimali");
+            rudisha 0;
+        }
+        wakati (c >= 48 && c <= 57) {
+            p->nafasi = p->nafasi + 1;
+            c = json_sasa(p);
+        }
+    }
+    kama (c == 101 || c == 69) {
+        p->nafasi = p->nafasi + 1;
+        c = json_sasa(p);
+        kama (c == 43 || c == 45) {
+            p->nafasi = p->nafasi + 1;
+            c = json_sasa(p);
+        }
+        kama (c < 48 || c > 57) {
+            json_kosa(p, "tarakimu inatarajiwa kwenye kipeo cha nambari");
+            rudisha 0;
+        }
+        wakati (c >= 48 && c <= 57) {
+            p->nafasi = p->nafasi + 1;
+            c = json_sasa(p);
+        }
+    }
+    Json* v = json_mpya(JSON_NAMBARI);
+    kama (v == 0) {
+        json_kosa(p, "kumbukumbu imeisha");
+        rudisha 0;
+    }
+    v->maandishi = json_nakili_n(p->chanzo + mwanzo, p->nafasi - mwanzo);
+    kama (v->maandishi == 0) {
+        json_kosa(p, "kumbukumbu imeisha");
+        rudisha 0;
+    }
+    v->nambari = json_thamani_ya_nambari(v->maandishi);
+    rudisha v;
+}
+
+// Changanua orodha `[ ... ]`; nafasi ya sasa ni '['.
+Json* json_changanua_orodha(JsonKichanganuzi* p) {
+    p->nafasi = p->nafasi + 1;
+    p->kina = p->kina + 1;
+    kama (p->kina > JSON_KINA_JUU) {
+        json_kosa(p, "kina cha nesting kimezidi kikomo (512)");
+        rudisha 0;
+    }
+    Json* orodha = json_orodha();
+    kama (orodha == 0) {
+        json_kosa(p, "kumbukumbu imeisha");
+        rudisha 0;
+    }
+    json_ruka_nafasi(p);
+    kama (json_sasa(p) == 93) {
+        p->nafasi = p->nafasi + 1;
+        p->kina = p->kina - 1;
+        rudisha orodha;
+    }
+    wakati (1 == 1) {
+        Json* v = json_changanua_thamani(p);
+        kama (v == 0) { rudisha 0; }
+        kama (json_orodha_ongeza(orodha, v) == 0) {
+            json_kosa(p, "kumbukumbu imeisha");
+            rudisha 0;
+        }
+        json_ruka_nafasi(p);
+        N32 c = json_sasa(p);
+        kama (c == 44) {
+            p->nafasi = p->nafasi + 1;
+            endelea;
+        }
+        kama (c == 93) {
+            p->nafasi = p->nafasi + 1;
+            p->kina = p->kina - 1;
+            rudisha orodha;
+        }
+        json_kosa(p, "',' au ']' inatarajiwa");
+        rudisha 0;
+    }
+    rudisha orodha;
+}
+
+// Changanua kitu `{ "ufunguo": thamani, ... }`; nafasi ya sasa ni '{'.
+Json* json_changanua_kitu(JsonKichanganuzi* p) {
+    p->nafasi = p->nafasi + 1;
+    p->kina = p->kina + 1;
+    kama (p->kina > JSON_KINA_JUU) {
+        json_kosa(p, "kina cha nesting kimezidi kikomo (512)");
+        rudisha 0;
+    }
+    Json* kitu = json_kitu();
+    kama (kitu == 0) {
+        json_kosa(p, "kumbukumbu imeisha");
+        rudisha 0;
+    }
+    json_ruka_nafasi(p);
+    kama (json_sasa(p) == 125) {
+        p->nafasi = p->nafasi + 1;
+        p->kina = p->kina - 1;
+        rudisha kitu;
+    }
+    wakati (1 == 1) {
+        json_ruka_nafasi(p);
+        kama (json_sasa(p) != 34) {
+            json_kosa(p, "ufunguo (mfuatano kwenye nukuu) unatarajiwa");
+            rudisha 0;
+        }
+        N8* ufunguo = json_changanua_herufi(p);
+        kama (ufunguo == 0) { rudisha 0; }
+        json_ruka_nafasi(p);
+        kama (json_sasa(p) != 58) {
+            json_kosa(p, "':' inatarajiwa baada ya ufunguo");
+            rudisha 0;
+        }
+        p->nafasi = p->nafasi + 1;
+        Json* v = json_changanua_thamani(p);
+        kama (v == 0) { rudisha 0; }
+        kama (json_kitu_weka(kitu, ufunguo, v) == 0) {
+            json_kosa(p, "kumbukumbu imeisha");
+            rudisha 0;
+        }
+        json_ruka_nafasi(p);
+        N32 c = json_sasa(p);
+        kama (c == 44) {
+            p->nafasi = p->nafasi + 1;
+            endelea;
+        }
+        kama (c == 125) {
+            p->nafasi = p->nafasi + 1;
+            p->kina = p->kina - 1;
+            rudisha kitu;
+        }
+        json_kosa(p, "',' au '}' inatarajiwa");
+        rudisha 0;
+    }
+    rudisha kitu;
+}
+
+// Changanua thamani yoyote kwenye nafasi ya sasa.
+Json* json_changanua_thamani(JsonKichanganuzi* p) {
+    json_ruka_nafasi(p);
+    N32 c = json_sasa(p);
+    kama (c < 0) {
+        json_kosa(p, "mwisho wa maandishi usiotarajiwa: thamani inatarajiwa");
+        rudisha 0;
+    }
+    kama (c == 123) { rudisha json_changanua_kitu(p); }
+    kama (c == 91) { rudisha json_changanua_orodha(p); }
+    kama (c == 34) {
+        N8* s = json_changanua_herufi(p);
+        kama (s == 0) { rudisha 0; }
+        Json* v = json_mpya(JSON_MFUATANO);
+        kama (v == 0) {
+            json_kosa(p, "kumbukumbu imeisha");
+            rudisha 0;
+        }
+        v->maandishi = s;
+        rudisha v;
+    }
+    kama (c == 45 || (c >= 48 && c <= 57)) { rudisha json_changanua_nambari(p); }
+    kama (c == 116) {
+        kama (json_neno(p, "true")) { rudisha json_bool(1); }
+    }
+    kama (c == 102) {
+        kama (json_neno(p, "false")) { rudisha json_bool(0); }
+    }
+    kama (c == 110) {
+        kama (json_neno(p, "null")) { rudisha json_null(); }
+    }
+    json_kosa(p, "herufi isiyotarajiwa (thamani ya JSON inatarajiwa)");
+    rudisha 0;
+}
+
+// Changanua maandishi ya JSON ya urefu `urefu` (baiti). Inarudisha
+// thamani ya mzizi, au 0 kukiwa na kosa (na `kosa` inajazwa).
+Json* json_changanua_n(N8* data, N32 urefu, JsonKosa* kosa) {
+    kosa->msimbo = 0;
+    kosa->nafasi = 0;
+    kosa->mstari = 0;
+    kosa->safu = 0;
+    kosa->ujumbe = 0;
+    JsonKichanganuzi* p = tenga(ukubwa(JsonKichanganuzi));
+    kama (p == 0) {
+        kosa->msimbo = 1;
+        kosa->ujumbe = "kumbukumbu imeisha";
+        rudisha 0;
+    }
+    p->chanzo = data;
+    p->urefu = urefu;
+    p->nafasi = 0;
+    p->kina = 0;
+    p->kosa = kosa;
+    Json* v = json_changanua_thamani(p);
+    kama (v == 0) { rudisha 0; }
+    json_ruka_nafasi(p);
+    kama (p->nafasi < p->urefu) {
+        json_kosa(p, "maandishi ya ziada baada ya thamani ya JSON");
+        rudisha 0;
+    }
+    rudisha v;
+}
+
+// Changanua mfuatano unaoishia kwa NUL.
+Json* json_changanua(N8* maandishi, JsonKosa* kosa) {
+    rudisha json_changanua_n(maandishi, urefu_wa_mfuatano(maandishi), kosa);
+}
+
+// Andika ujumbe wa kosa (pamoja na mstari/safu) kwenye `bafa`, kama
+// "kosa la JSON: <maelezo> (mstari M, safu S, nafasi N)". Inarudisha
+// idadi ya baiti zilizoandikwa (bila NUL). Tunatumia bafa_mfuatano /
+// bafa_n64 za mfuatano.swa kwa sababu mfuatano_umbiza inapokea hoja
+// zote kama N64 (kielekezi cha %s hakipitishwi moja kwa moja).
+N64 json_ujumbe_wa_kosa(JsonKosa* kosa, N8* bafa, N64 uwezo) {
+    kama (uwezo == 0) { rudisha 0; }
+    N64 nafasi = 0;
+    bafa_mfuatano(bafa, uwezo, &nafasi, "kosa la JSON: ");
+    bafa_mfuatano(bafa, uwezo, &nafasi, kosa->ujumbe);
+    bafa_mfuatano(bafa, uwezo, &nafasi, " (mstari ");
+    bafa_n64(bafa, uwezo, &nafasi, kosa->mstari);
+    bafa_mfuatano(bafa, uwezo, &nafasi, ", safu ");
+    bafa_n64(bafa, uwezo, &nafasi, kosa->safu);
+    bafa_mfuatano(bafa, uwezo, &nafasi, ", nafasi ");
+    bafa_n64(bafa, uwezo, &nafasi, kosa->nafasi);
+    bafa_mfuatano(bafa, uwezo, &nafasi, ")");
+    bafa[nafasi] = 0;
+    rudisha nafasi;
+}

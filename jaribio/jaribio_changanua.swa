@@ -1,0 +1,125 @@
+// jaribio_changanua.swa -- kichanganuzi: thamani sahihi za kila aina.
+
+N32 main() {
+    JsonKosa kosa;
+
+    Json* n = json_changanua("null", &kosa);
+    thibitisha_si_tupu(n, "null: imechanganuliwa");
+    thibitisha_n32(json_aina(n), JSON_NULL, "null: aina");
+
+    Json* t = json_changanua("  true ", &kosa);
+    thibitisha_n32(json_thamani_bool(t), 1, "true (na nafasi tupu)");
+    Json* f = json_changanua("false", &kosa);
+    thibitisha_n32(json_aina(f), JSON_BOOL, "false: aina");
+    thibitisha_n32(json_thamani_bool(f), 0, "false: thamani");
+
+    Json* a = json_changanua("42", &kosa);
+    thibitisha(json_thamani_nambari(a) == 42.0, "nambari 42");
+    Json* b = json_changanua("-7", &kosa);
+    thibitisha(json_thamani_nambari(b) == -7.0, "nambari -7");
+    Json* c = json_changanua("3.25", &kosa);
+    thibitisha(json_thamani_nambari(c) == 3.25, "nambari 3.25");
+    Json* d = json_changanua("-0.5", &kosa);
+    thibitisha(json_thamani_nambari(d) == -0.5, "nambari -0.5");
+    Json* e = json_changanua("1e3", &kosa);
+    thibitisha(json_thamani_nambari(e) == 1000.0, "nambari 1e3");
+    Json* g = json_changanua("2.5E+2", &kosa);
+    thibitisha(json_thamani_nambari(g) == 250.0, "nambari 2.5E+2");
+    Json* h = json_changanua("125e-2", &kosa);
+    thibitisha(json_thamani_nambari(h) == 1.25, "nambari 125e-2");
+    Json* z = json_changanua("0", &kosa);
+    thibitisha(json_thamani_nambari(z) == 0.0, "nambari 0");
+    thibitisha_mfuatano(a->maandishi, "42", "nambari: maandishi asili yamehifadhiwa");
+
+    Json* s = json_changanua("\"habari yako\"", &kosa);
+    thibitisha_mfuatano(json_thamani_mfuatano(s), "habari yako", "mfuatano rahisi");
+    Json* tupu = json_changanua("\"\"", &kosa);
+    thibitisha_n32(json_urefu(tupu), 0, "mfuatano mtupu");
+
+    // Escape zote: \" \\ \/ \b \f \n \r \t
+    Json* es = json_changanua("\"a\\\"b\\\\c\\/d\\be\\ff\\ng\\rh\\ti\"", &kosa);
+    thibitisha_si_tupu(es, "escape: imechanganuliwa");
+    N8* ev = json_thamani_mfuatano(es);
+    thibitisha_n32(json_urefu(es), 17, "escape: urefu");
+    thibitisha_n32(ev[1], 34, "escape: \\\"");
+    thibitisha_n32(ev[3], 92, "escape: \\\\");
+    thibitisha_n32(ev[5], 47, "escape: \\/");
+    thibitisha_n32(ev[7], 8, "escape: \\b");
+    thibitisha_n32(ev[9], 12, "escape: \\f");
+    thibitisha_n32(ev[11], 10, "escape: \\n");
+    thibitisha_n32(ev[13], 13, "escape: \\r");
+    thibitisha_n32(ev[15], 9, "escape: \\t");
+
+    // \u: A (1 baiti), é (2), € (3), 😀 kupitia surrogate pair (4)
+    Json* u1 = json_changanua("\"\\u0041\"", &kosa);
+    thibitisha_mfuatano(json_thamani_mfuatano(u1), "A", "\\u0041");
+    Json* u2 = json_changanua("\"\\u00e9\"", &kosa);
+    thibitisha_n32(json_urefu(u2), 2, "\\u00e9: urefu wa UTF-8 = 2");
+    N8* v2 = json_thamani_mfuatano(u2);
+    thibitisha_n32(v2[0], -61, "\\u00e9: baiti 0xC3");
+    thibitisha_n32(v2[1], -87, "\\u00e9: baiti 0xA9");
+    Json* u3 = json_changanua("\"\\u20AC\"", &kosa);
+    thibitisha_n32(json_urefu(u3), 3, "\\u20AC: urefu wa UTF-8 = 3");
+    N8* v3 = json_thamani_mfuatano(u3);
+    thibitisha_n32(v3[0], -30, "\\u20AC: baiti 0xE2");
+    thibitisha_n32(v3[1], -126, "\\u20AC: baiti 0x82");
+    thibitisha_n32(v3[2], -84, "\\u20AC: baiti 0xAC");
+    Json* u4 = json_changanua("\"\\uD83D\\uDE00\"", &kosa);
+    thibitisha_si_tupu(u4, "surrogate pair: imechanganuliwa");
+    thibitisha_n32(json_urefu(u4), 4, "surrogate pair: urefu wa UTF-8 = 4");
+    N8* v4 = json_thamani_mfuatano(u4);
+    thibitisha_n32(v4[0], -16, "U+1F600: baiti 0xF0");
+    thibitisha_n32(v4[1], -97, "U+1F600: baiti 0x9F");
+    thibitisha_n32(v4[2], -104, "U+1F600: baiti 0x98");
+    thibitisha_n32(v4[3], -128, "U+1F600: baiti 0x80");
+
+    // Baiti za UTF-8 ghafi (>= 0x80) ndani ya mfuatano zinapita.
+    // (Swa haina \xNN kwenye herufi halisi -- tunajenga baiti kwa mkono.)
+    N8 rb[8];
+    rb[0] = 34;
+    rb[1] = 195;
+    rb[2] = 169;
+    rb[3] = 34;
+    rb[4] = 0;
+    Json* raw = json_changanua(rb, &kosa);
+    thibitisha_si_tupu(raw, "UTF-8 ghafi: imechanganuliwa");
+    thibitisha_n32(json_urefu(raw), 2, "UTF-8 ghafi: urefu");
+    thibitisha_n32(json_thamani_mfuatano(raw)[0], -61, "UTF-8 ghafi: baiti 0xC3 inapita");
+    thibitisha_n32(json_thamani_mfuatano(raw)[1], -87, "UTF-8 ghafi: baiti 0xA9 inapita");
+
+    // Orodha na vitu
+    Json* o0 = json_changanua("[]", &kosa);
+    thibitisha_n32(json_aina(o0), JSON_ORODHA, "orodha tupu: aina");
+    thibitisha_n32(json_urefu(o0), 0, "orodha tupu: urefu");
+    Json* k0 = json_changanua("{}", &kosa);
+    thibitisha_n32(json_aina(k0), JSON_KITU, "kitu tupu: aina");
+    thibitisha_n32(json_urefu(k0), 0, "kitu tupu: urefu");
+    Json* k00 = json_changanua("{ }", &kosa);
+    thibitisha_n32(json_aina(k00), JSON_KITU, "kitu tupu chenye nafasi");
+
+    Json* o1 = json_changanua("[1, 2 , 3,\n 4]", &kosa);
+    thibitisha_n32(json_urefu(o1), 4, "orodha: urefu 4");
+    thibitisha(json_thamani_nambari(json_kipengele(o1, 3)) == 4.0, "orodha: kipengele cha 3");
+
+    Json* k1 = json_changanua("{\"a\": 1, \"b\": [true, null], \"c\": {\"d\": \"x\"}}", &kosa);
+    thibitisha_si_tupu(k1, "kitu: imechanganuliwa");
+    thibitisha_n32(json_urefu(k1), 3, "kitu: funguo 3");
+    thibitisha(json_thamani_nambari(json_pata(k1, "a")) == 1.0, "kitu: a");
+    Json* bb = json_pata(k1, "b");
+    thibitisha_n32(json_urefu(bb), 2, "kitu: b urefu 2");
+    thibitisha_n32(json_thamani_bool(json_kipengele(bb, 0)), 1, "kitu: b[0] = true");
+    thibitisha_n32(json_aina(json_kipengele(bb, 1)), JSON_NULL, "kitu: b[1] = null");
+    thibitisha_mfuatano(json_thamani_mfuatano(json_pata(json_pata(k1, "c"), "d")), "x", "kitu: c.d = x");
+
+    // Ufunguo unaorudiwa: thamani ya mwisho inashinda, nafasi ya kwanza inabaki.
+    Json* rd = json_changanua("{\"x\": 1, \"y\": 2, \"x\": 3}", &kosa);
+    thibitisha_n32(json_urefu(rd), 2, "ufunguo unaorudiwa: funguo 2");
+    thibitisha(json_thamani_nambari(json_pata(rd, "x")) == 3.0, "ufunguo unaorudiwa: x = 3");
+    thibitisha_mfuatano(json_ufunguo_wa(rd, 0), "x", "ufunguo unaorudiwa: x bado wa kwanza");
+
+    // Ufunguo wenye escape
+    Json* ek = json_changanua("{\"a\\nb\": 5}", &kosa);
+    thibitisha(json_thamani_nambari(json_pata(ek, "a\nb")) == 5.0, "ufunguo wenye \\n");
+
+    rudisha jaribio_mwisho();
+}
