@@ -15,6 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Hakuna baiti NUL kwenye faili za maandishi (GitHub huonyesha faili kama binary, si Markdown)
+        run: |
+          bad=0
+          for f in $(git ls-files "*.md" "*.swa" "*.sh" "*.yml"); do
+            if [ "$(tr -cd "\000" < "$f" | wc -c)" != 0 ]; then echo "NUL: $f"; bad=1; fi
+          done
+          exit $bad
+
       - name: Pata mkusanyaji wa Swa
         run: git clone --depth 1 https://github.com/lugha-swa/swa.git "$RUNNER_TEMP/swa"
 
