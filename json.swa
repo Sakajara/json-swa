@@ -1,0 +1,237 @@
+// json.swa -- maktaba ya JSON kwa lugha ya Swa (kuchanganua + kuandika)
+//
+// Bila libc. Inatumia tu maktaba ya msingi ya Swa: kumbukumbu.swa
+// (tenga, nakili) na mfuatano.swa (urefu_wa_mfuatano, mfuatano_umbiza).
+//
+// Uwakilishi wa thamani: muundo MMOJA (Json) wenye uwanja wa "aina"
+// (tag) -- Swa haina union wala enum, kwa hiyo aina sita za JSON
+// (null, bool, nambari, mfuatano, orodha, kitu) zinatofautishwa kwa
+// uwanja wa `aina`, na kila aina hutumia sehemu yake ya nyanja tu.
+// Majina yote ya kazi/aina/vigezo vya ulimwengu yanaanza na `json_`
+// au `Json` kwa sababu Swa haina nafasi za majina (namespace).
+//
+// Kumbukumbu: inatengwa kwa arena ya kumbukumbu.swa, ambayo haifungui
+// vipande vya kibinafsi (achilia_arena ni no-op kwa makusudi) --
+// kumbukumbu inarudishwa programu inapoisha.
+
+husisha { maktaba/kumbukumbu.swa }
+husisha { maktaba/mfuatano.swa }
+
+// ==========================================================
+// 1. Uwakilishi wa thamani
+// ==========================================================
+
+// Aina za thamani (thamani za uwanja `aina`).
+N32 JSON_NULL = 0;
+N32 JSON_BOOL = 1;
+N32 JSON_NAMBARI = 2;
+N32 JSON_MFUATANO = 3;
+N32 JSON_ORODHA = 4;
+N32 JSON_KITU = 5;
+
+// Kina cha juu kabisa cha nesting (orodha/vitu ndani ya orodha/vitu)
+// kinachokubaliwa na kichanganuzi -- kinalinda rafu ya wito.
+N32 JSON_KINA_JUU = 512;
+
+// Nyanja zinazotumika kwa kila aina:
+//   JSON_NULL      -- hakuna
+//   JSON_BOOL      -- kweli (0 au 1)
+//   JSON_NAMBARI   -- nambari (thamani ya D64) na maandishi (maandishi
+//                     asili kama yalivyoandikwa kwenye JSON, au 0 kama
+//                     nambari imejengwa kwa programu)
+//   JSON_MFUATANO  -- maandishi (baiti za UTF-8, zinaishia kwa NUL)
+//   JSON_ORODHA    -- vipengele[0..idadi-1]
+//   JSON_KITU      -- funguo[i] na vipengele[i] (jozi sambamba, kwa
+//                     mpangilio wa kuingizwa)
+// Muundo wa Swa umepakiwa bila nafasi za ulinganifu (packed).
+muundo Json {
+    N32 aina;
+    N32 kweli;
+    D64 nambari;
+    N8* maandishi;
+    Json** vipengele;
+    N8** funguo;
+    N32 idadi;
+    N32 uwezo;
+};
+
+// Tengeneza thamani tupu ya aina fulani. Inarudisha 0 kama kumbukumbu
+// imeisha.
+Json* json_mpya(N32 aina) {
+    Json* v = tenga(ukubwa(Json));
+    kama (v == 0) { rudisha 0; }
+    v->aina = aina;
+    v->kweli = 0;
+    v->nambari = 0.0;
+    v->maandishi = 0;
+    v->vipengele = 0;
+    v->funguo = 0;
+    v->idadi = 0;
+    v->uwezo = 0;
+    rudisha v;
+}
+
+// Nakili baiti `n` za `chanzo` kwenye mfuatano mpya unaoishia kwa NUL.
+N8* json_nakili_n(N8* chanzo, N32 n) {
+    N8* r = tenga(n + 1);
+    kama (r == 0) { rudisha 0; }
+    nakili(r, chanzo, n);
+    r[n] = 0;
+    rudisha r;
+}
+
+Json* json_null() {
+    rudisha json_mpya(JSON_NULL);
+}
+
+Json* json_bool(N32 kweli) {
+    Json* v = json_mpya(JSON_BOOL);
+    kama (v == 0) { rudisha 0; }
+    v->kweli = 0;
+    kama (kweli != 0) { v->kweli = 1; }
+    rudisha v;
+}
+
+// Nambari iliyojengwa kwa programu (haina maandishi asili).
+Json* json_nambari(D64 x) {
+    Json* v = json_mpya(JSON_NAMBARI);
+    kama (v == 0) { rudisha 0; }
+    v->nambari = x;
+    rudisha v;
+}
+
+// Mfuatano (unanakiliwa -- `s` inaweza kubadilishwa baadaye).
+Json* json_mfuatano(N8* s) {
+    Json* v = json_mpya(JSON_MFUATANO);
+    kama (v == 0) { rudisha 0; }
+    v->maandishi = json_nakili_n(s, urefu_wa_mfuatano(s));
+    kama (v->maandishi == 0) { rudisha 0; }
+    rudisha v;
+}
+
+Json* json_orodha() {
+    rudisha json_mpya(JSON_ORODHA);
+}
+
+Json* json_kitu() {
+    rudisha json_mpya(JSON_KITU);
+}
+
+// Hakikisha kuna nafasi ya angalau kipengele kimoja zaidi. Inakua
+// mara mbili (kuanzia 4). Inarudisha 1 kwa mafanikio, 0 kama
+// kumbukumbu imeisha. Tunanakili baiti `idadi*8` tu kwa nakili()
+// (badala ya badili() ya maktaba, ambayo inasoma baiti 8 zaidi ya
+// kipande cha zamani).
+N32 json_kua(Json* v) {
+    kama (v->idadi < v->uwezo) { rudisha 1; }
+    N32 mpya = v->uwezo * 2;
+    kama (mpya < 4) { mpya = 4; }
+    N64 baiti = ukubwa(N64) * mpya;
+    N64 zamani = ukubwa(N64) * v->idadi;
+    N8* vp = tenga(baiti);
+    kama (vp == 0) { rudisha 0; }
+    kama (v->idadi > 0) { nakili(vp, v->vipengele, zamani); }
+    kama (v->aina == JSON_KITU) {
+        N8* fp = tenga(baiti);
+        kama (fp == 0) { rudisha 0; }
+        kama (v->idadi > 0) { nakili(fp, v->funguo, zamani); }
+        v->funguo = fp;
+    }
+    v->vipengele = vp;
+    v->uwezo = mpya;
+    rudisha 1;
+}
+
+// Ongeza kipengele mwishoni mwa orodha. Inarudisha 1/0.
+N32 json_orodha_ongeza(Json* orodha, Json* kipengele) {
+    kama (orodha == 0 || kipengele == 0) { rudisha 0; }
+    kama (orodha->aina != JSON_ORODHA) { rudisha 0; }
+    kama (json_kua(orodha) == 0) { rudisha 0; }
+    orodha->vipengele[orodha->idadi] = kipengele;
+    orodha->idadi = orodha->idadi + 1;
+    rudisha 1;
+}
+
+// Tafuta nafasi ya ufunguo kwenye kitu; -1 kama haupo.
+N32 json_nafasi_ya_ufunguo(Json* kitu, N8* ufunguo) {
+    N32 i = 0;
+    wakati (i < kitu->idadi) {
+        kama (linganisha_mfuatano(kitu->funguo[i], ufunguo) == 0) { rudisha i; }
+        i = i + 1;
+    }
+    rudisha -1;
+}
+
+// Weka `kipengele` chini ya `ufunguo`. Ufunguo ukiwepo tayari, thamani
+// yake inabadilishwa mahali pale pale (mpangilio wa ufunguo wa
+// kwanza unabaki -- sawa na dict ya Python: ufunguo unaorudiwa,
+// thamani ya MWISHO ndiyo inashinda). Ufunguo unanakiliwa.
+// Inarudisha 1/0.
+N32 json_kitu_weka(Json* kitu, N8* ufunguo, Json* kipengele) {
+    kama (kitu == 0 || kipengele == 0) { rudisha 0; }
+    kama (kitu->aina != JSON_KITU) { rudisha 0; }
+    N32 nafasi = json_nafasi_ya_ufunguo(kitu, ufunguo);
+    kama (nafasi >= 0) {
+        kitu->vipengele[nafasi] = kipengele;
+        rudisha 1;
+    }
+    kama (json_kua(kitu) == 0) { rudisha 0; }
+    N8* nakala = json_nakili_n(ufunguo, urefu_wa_mfuatano(ufunguo));
+    kama (nakala == 0) { rudisha 0; }
+    kitu->funguo[kitu->idadi] = nakala;
+    kitu->vipengele[kitu->idadi] = kipengele;
+    kitu->idadi = kitu->idadi + 1;
+    rudisha 1;
+}
+
+// ---- Vifikiaji (accessors) ----
+
+N32 json_aina(Json* v) { rudisha v->aina; }
+
+// Idadi ya vipengele (orodha/kitu) au urefu wa baiti (mfuatano);
+// 0 kwa aina nyingine.
+N32 json_urefu(Json* v) {
+    kama (v->aina == JSON_ORODHA || v->aina == JSON_KITU) { rudisha v->idadi; }
+    kama (v->aina == JSON_MFUATANO) { rudisha urefu_wa_mfuatano(v->maandishi); }
+    rudisha 0;
+}
+
+// Kipengele cha orodha kwa faharisi; 0 kama nje ya mipaka au si orodha.
+Json* json_kipengele(Json* orodha, N32 faharisi) {
+    kama (orodha->aina != JSON_ORODHA) { rudisha 0; }
+    kama (faharisi < 0 || faharisi >= orodha->idadi) { rudisha 0; }
+    rudisha orodha->vipengele[faharisi];
+}
+
+// Thamani ya kitu kwa ufunguo; 0 kama haipo au si kitu.
+Json* json_pata(Json* kitu, N8* ufunguo) {
+    kama (kitu->aina != JSON_KITU) { rudisha 0; }
+    N32 nafasi = json_nafasi_ya_ufunguo(kitu, ufunguo);
+    kama (nafasi < 0) { rudisha 0; }
+    rudisha kitu->vipengele[nafasi];
+}
+
+// Ufunguo wa kitu kwa faharisi; 0 kama nje ya mipaka au si kitu.
+N8* json_ufunguo_wa(Json* kitu, N32 faharisi) {
+    kama (kitu->aina != JSON_KITU) { rudisha 0; }
+    kama (faharisi < 0 || faharisi >= kitu->idadi) { rudisha 0; }
+    rudisha kitu->funguo[faharisi];
+}
+
+// Thamani ya bool (0/1); 0 kwa aina isiyo bool.
+N32 json_thamani_bool(Json* v) {
+    kama (v->aina != JSON_BOOL) { rudisha 0; }
+    rudisha v->kweli;
+}
+
+// Thamani ya nambari; 0.0 kwa aina isiyo nambari.
+D64 json_thamani_nambari(Json* v) {
+    kama (v->aina != JSON_NAMBARI) { rudisha 0.0; }
+    rudisha v->nambari;
+}
+
+// Thamani ya mfuatano; 0 kwa aina isiyo mfuatano.
+N8* json_thamani_mfuatano(Json* v) {
+    kama (v->aina != JSON_MFUATANO) { rudisha 0; }
+    rudisha v->maandishi;
+}
