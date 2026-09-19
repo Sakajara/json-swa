@@ -1,0 +1,287 @@
+// jaribio_fuzz.swa -- jaribio la mali (property/fuzz), Swa safi, mbegu
+// inayojulikana (linajirudia kabisa).
+//
+// Kwa kila kesi tunazalisha thamani ya JSON nasibu (kina hadi 4, nambari
+// kamili na desimali, mifuatano yenye nukuu, backslash, herufi za
+// kudhibiti, UTF-8 ya baiti 2/3/4) kisha tunathibitisha sifa zifuatazo:
+//
+//   1. compact: kuandika kunatoa JSON inayosomeka; kuisoma kunarudisha
+//      thamani ile ile (nambari kwa makosa <= 1e-12 kiasi; kila kitu
+//      kingine kabisa); kuiandika tena kunatoa mfuatano ule ule (fixpoint).
+//   2. pretty: matokeo ya pretty yanasomeka na yanawakilisha thamani ile
+//      ile; kuandika compact kutoka kwake kunatoa mfuatano ule ule wa (1).
+//   3. mutation: tunaharibu compact kwa kubadilisha/kufuta/kuingiza/
+//      kukata baiti nasibu. Kichanganuzi KISIANGUKE wala kuning'inia;
+//      ingizo likikataliwa lazima litoe ujumbe wa kosa; likikubaliwa
+//      lazima liandikwe upya kama JSON inayosomeka na iliyo fixpoint.
+//
+// Matumizi:  ./.jenga/jaribio_fuzz [mbegu] [idadi]
+
+// ---- jenereta ya nasibu (LCG; Swa safi, si nasibu.swa ambayo inatumia libc) ----
+N64 fz_hali = 20260919;
+
+N32 fz_n(N32 upeo) {
+    fz_hali = (fz_hali * 1103515245 + 12345) % 2147483648;
+    N64 juu = fz_hali / 65536;
+    rudisha juu % upeo;
+}
+
+// Nambari nasibu katika [0, upeo) kwa upeo hadi ~1e9.
+N32 fz_kubwa(N32 upeo) {
+    N32 a = fz_n(32768);
+    N32 b = fz_n(32768);
+    rudisha (a * 32768 + b) % upeo;
+}
+
+// ---- kuzalisha thamani ----
+N8* fz_mfuatano() {
+    N32 ur = fz_n(14);
+    N8* b = tenga(ur * 4 + 1);
+    kama (b == 0) { rudisha 0; }
+    N32 w = 0;
+    N32 i = 0;
+    wakati (i < ur) {
+        N32 c = fz_n(12);
+        kama (c == 0) { b[w] = 34; w = w + 1; }
+        sivyo { kama (c == 1) { b[w] = 92; w = w + 1; }
+        sivyo { kama (c == 2) { b[w] = 1 + fz_n(31); w = w + 1; }
+        sivyo { kama (c == 3) { b[w] = 47; w = w + 1; }
+        sivyo { kama (c == 4) { b[w] = 195; b[w + 1] = 169; w = w + 2; }
+        sivyo { kama (c == 5) { b[w] = 230; b[w + 1] = 151; b[w + 2] = 165; w = w + 3; }
+        sivyo { kama (c == 6) { b[w] = 240; b[w + 1] = 159; b[w + 2] = 152; b[w + 3] = 128; w = w + 4; }
+        sivyo { kama (c == 7) { b[w] = 127; w = w + 1; }
+        sivyo { b[w] = 97 + fz_n(26); w = w + 1; } } } } } } } }
+        i = i + 1;
+    }
+    b[w] = 0;
+    rudisha b;
+}
+
+Json* fz_thamani(N32 kina) {
+    N32 r = 0;
+    kama (kina > 0) { r = fz_n(10); } sivyo { r = fz_n(6); }
+    kama (r == 0) { rudisha json_null(); }
+    kama (r == 1) { rudisha json_bool(fz_n(2)); }
+    kama (r == 2) {
+        D64 d = fz_kubwa(2000001) - 1000000;
+        rudisha json_nambari(d);
+    }
+    kama (r == 3) {
+        D64 a = fz_kubwa(2000001) - 1000000;
+        rudisha json_nambari(a / 1000.0);
+    }
+    kama (r == 4 || r == 5) {
+        N8* s = fz_mfuatano();
+        kama (s == 0) { rudisha 0; }
+        rudisha json_mfuatano(s);
+    }
+    kama (r == 6 || r == 7) {
+        Json* o = json_orodha();
+        kama (o == 0) { rudisha 0; }
+        N32 n = fz_n(5);
+        N32 i = 0;
+        wakati (i < n) {
+            json_orodha_ongeza(o, fz_thamani(kina - 1));
+            i = i + 1;
+        }
+        rudisha o;
+    }
+    Json* k = json_kitu();
+    kama (k == 0) { rudisha 0; }
+    N32 n2 = fz_n(5);
+    N32 j = 0;
+    wakati (j < n2) {
+        N8* ufunguo = fz_mfuatano();
+        kama (ufunguo != 0) { json_kitu_weka(k, ufunguo, fz_thamani(kina - 1)); }
+        j = j + 1;
+    }
+    rudisha k;
+}
+
+// ---- ulinganifu wa thamani (nambari kwa makosa madogo, vingine kabisa) ----
+D64 fz_abs(D64 x) {
+    kama (x < 0.0) { rudisha 0.0 - x; }
+    rudisha x;
+}
+
+N32 fz_sawa(Json* a, Json* b) {
+    kama (a->aina != b->aina) { rudisha 0; }
+    kama (a->aina == JSON_NULL) { rudisha 1; }
+    kama (a->aina == JSON_BOOL) {
+        kama (a->kweli == b->kweli) { rudisha 1; }
+        rudisha 0;
+    }
+    kama (a->aina == JSON_NAMBARI) {
+        D64 x = a->nambari;
+        D64 y = b->nambari;
+        D64 t = 1.0;
+        kama (fz_abs(x) > t) { t = fz_abs(x); }
+        kama (fz_abs(y) > t) { t = fz_abs(y); }
+        kama (fz_abs(x - y) <= t / 1000000000000.0) { rudisha 1; }
+        rudisha 0;
+    }
+    kama (a->aina == JSON_MFUATANO) {
+        kama (linganisha_mfuatano(a->maandishi, b->maandishi) == 0) { rudisha 1; }
+        rudisha 0;
+    }
+    kama (a->idadi != b->idadi) { rudisha 0; }
+    N32 i = 0;
+    wakati (i < a->idadi) {
+        Json* mwenzake = b->vipengele[i];
+        kama (a->aina == JSON_KITU) {
+            mwenzake = json_pata(b, a->funguo[i]);
+            kama (mwenzake == 0) { rudisha 0; }
+        }
+        kama (fz_sawa(a->vipengele[i], mwenzake) == 0) { rudisha 0; }
+        i = i + 1;
+    }
+    rudisha 1;
+}
+
+W0 thibitisha_bafa(N8* p, N8* jina) {
+    N32 sawa = 0;
+    kama (p != 0) { sawa = 1; }
+    thibitisha(sawa, jina);
+}
+
+N32 sawa_mfuatano(N8* a, N8* b) {
+    kama (a == 0 || b == 0) { rudisha 0; }
+    kama (linganisha_mfuatano(a, b) == 0) { rudisha 1; }
+    rudisha 0;
+}
+
+// ---- kuharibu ingizo ----
+N8* fz_mutasi(N8* s, N32 ur, N32* mpya_ur) {
+    N8* m = tenga(ur + 8);
+    kama (m == 0) { *mpya_ur = 0; rudisha 0; }
+    nakili(m, s, ur);
+    N32 n = ur;
+    N32 ops = 1 + fz_n(3);
+    N32 k = 0;
+    wakati (k < ops) {
+        N32 op = fz_n(4);
+        kama (op == 0 && n > 0) {
+            m[fz_n(n)] = fz_n(256);
+        }
+        kama (op == 1 && n > 0) {
+            N32 pos = fz_n(n);
+            wakati (pos + 1 < n) { m[pos] = m[pos + 1]; pos = pos + 1; }
+            n = n - 1;
+        }
+        kama (op == 2) {
+            N32 pos2 = fz_n(n + 1);
+            N32 q = n;
+            wakati (q > pos2) { m[q] = m[q - 1]; q = q - 1; }
+            m[pos2] = fz_n(256);
+            n = n + 1;
+        }
+        kama (op == 3 && n > 0) {
+            n = fz_n(n);
+        }
+        k = k + 1;
+    }
+    *mpya_ur = n;
+    rudisha m;
+}
+
+N32 fz_zilizoonyeshwa = 0;
+
+W0 fz_onyesha(N8* ingizo) {
+    kama (fz_zilizoonyeshwa < 5) {
+        andika("  ingizo: %s\n", ingizo, 0, 0, 0, 0, 0);
+        fz_zilizoonyeshwa = fz_zilizoonyeshwa + 1;
+    }
+}
+
+N32 main(N32 argc, N8** argv) {
+    N32 mbegu = 20260919;
+    N32 idadi = 1500;
+    kama (argc > 1) { mbegu = mfuatano_hadi_n32(argv[1]); }
+    kama (argc > 2) { idadi = mfuatano_hadi_n32(argv[2]); }
+    fz_hali = mbegu;
+    andika("fuzz: mbegu=%d idadi=%d\n", mbegu, idadi, 0, 0, 0, 0);
+
+    N8 jina[256];
+    N32 kubaliwa = 0;
+    N32 kataliwa = 0;
+    N32 i = 0;
+    wakati (i < idadi) {
+        Json* v = fz_thamani(4);
+        mfuatano_umbiza(jina, 256, "fuzz #%d: thamani imezalishwa", i, 0, 0, 0, 0, 0);
+        thibitisha_si_tupu(v, jina);
+        kama (v == 0) { i = i + 1; endelea; }
+
+        // (1) compact
+        N8* s1 = json_hadi_mfuatano(v);
+        mfuatano_umbiza(jina, 256, "fuzz #%d: compact imeandikwa", i, 0, 0, 0, 0, 0);
+        thibitisha_bafa(s1, jina);
+        kama (s1 == 0) { i = i + 1; endelea; }
+        JsonKosa k1;
+        Json* v2 = json_changanua(s1, &k1);
+        mfuatano_umbiza(jina, 256, "fuzz #%d: compact inasomeka tena", i, 0, 0, 0, 0, 0);
+        thibitisha_si_tupu(v2, jina);
+        kama (v2 == 0) { fz_onyesha(s1); i = i + 1; endelea; }
+        mfuatano_umbiza(jina, 256, "fuzz #%d: thamani inarudi ile ile baada ya compact", i, 0, 0, 0, 0, 0);
+        thibitisha(fz_sawa(v, v2), jina);
+        mfuatano_umbiza(jina, 256, "fuzz #%d: compact ni fixpoint", i, 0, 0, 0, 0, 0);
+        thibitisha(sawa_mfuatano(json_hadi_mfuatano(v2), s1), jina);
+
+        // (2) pretty
+        N8* p = json_hadi_mfuatano_mzuri(v, 2);
+        mfuatano_umbiza(jina, 256, "fuzz #%d: pretty imeandikwa", i, 0, 0, 0, 0, 0);
+        thibitisha_bafa(p, jina);
+        kama (p != 0) {
+            JsonKosa k2;
+            Json* v3 = json_changanua(p, &k2);
+            mfuatano_umbiza(jina, 256, "fuzz #%d: pretty inasomeka tena", i, 0, 0, 0, 0, 0);
+            thibitisha_si_tupu(v3, jina);
+            kama (v3 != 0) {
+                mfuatano_umbiza(jina, 256, "fuzz #%d: pretty inawakilisha thamani ile ile", i, 0, 0, 0, 0, 0);
+                thibitisha(fz_sawa(v, v3), jina);
+                mfuatano_umbiza(jina, 256, "fuzz #%d: pretty na compact zinakubaliana", i, 0, 0, 0, 0, 0);
+                thibitisha(sawa_mfuatano(json_hadi_mfuatano(v3), s1), jina);
+            }
+        }
+
+        // (3) mutation
+        N32 ur = urefu_wa_mfuatano(s1);
+        N32 m = 0;
+        wakati (m < 4) {
+            N32 mur = 0;
+            N8* mz = fz_mutasi(s1, ur, &mur);
+            kama (mz != 0) {
+                JsonKosa km;
+                Json* w = json_changanua_n(mz, mur, &km);
+                kama (w == 0) {
+                    kataliwa = kataliwa + 1;
+                    N8 uj[512];
+                    json_ujumbe_wa_kosa(&km, uj, 512);
+                    mfuatano_umbiza(jina, 256, "fuzz #%d: ingizo lililokataliwa lina ujumbe wa kosa", i, 0, 0, 0, 0, 0);
+                    thibitisha(urefu_wa_mfuatano(uj) > 0, jina);
+                } sivyo {
+                    kubaliwa = kubaliwa + 1;
+                    N8* t1 = json_hadi_mfuatano(w);
+                    mfuatano_umbiza(jina, 256, "fuzz #%d: ingizo lililokubaliwa linaandikwa upya", i, 0, 0, 0, 0, 0);
+                    thibitisha_bafa(t1, jina);
+                    kama (t1 != 0) {
+                        JsonKosa kw;
+                        Json* w2 = json_changanua(t1, &kw);
+                        mfuatano_umbiza(jina, 256, "fuzz #%d: uandishi upya wa ingizo lililokubaliwa unasomeka", i, 0, 0, 0, 0, 0);
+                        thibitisha_si_tupu(w2, jina);
+                        kama (w2 != 0) {
+                            mfuatano_umbiza(jina, 256, "fuzz #%d: ingizo lililokubaliwa ni fixpoint", i, 0, 0, 0, 0, 0);
+                            thibitisha(sawa_mfuatano(json_hadi_mfuatano(w2), t1), jina);
+                        } sivyo { fz_onyesha(t1); }
+                    }
+                }
+            }
+            m = m + 1;
+        }
+        i = i + 1;
+    }
+    andika("fuzz: mutation zilizokubaliwa %d, zilizokataliwa %d\n", kubaliwa, kataliwa, 0, 0, 0, 0);
+    // Hakikisha jaribio lilifanya kazi halisi pande zote mbili.
+    thibitisha(kubaliwa > 0, "fuzz: baadhi ya mutation zimekubaliwa");
+    thibitisha(kataliwa > 0, "fuzz: baadhi ya mutation zimekataliwa");
+    rudisha jaribio_mwisho();
+}

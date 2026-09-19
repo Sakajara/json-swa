@@ -1,0 +1,136 @@
+// jaribio_corpus.swa -- mkusanyiko wa kesi (golden corpus) kwa mtindo wa
+// JSONTestSuite: jaribio/corpus/ORODHA.txt ina mstari kwa kila kesi,
+//   "y jina.json"  -> RFC 8259 inasema SAHIHI: lazima ikubaliwe
+//   "n jina.json"  -> RFC 8259 inasema BATILI: lazima ikataliwe
+//
+// Matarajio yanatoka kwenye RFC 8259, si kutoka kwa tabia ya kichanganuzi
+// hiki. Kwa kila kesi sahihi pia tunathibitisha kuwa kuandika tena
+// (compact NA pretty) kunatoa JSON sahihi ambayo kuiandika tena ni
+// fixpoint (matokeo yale yale).
+//
+// Jaribio hili linaendeshwa kutoka saraka ya mzizi wa hazina (jaribu.sh).
+
+husisha { maktaba/faili.swa }
+
+N32 UWEZO_ORODHA = 65536;
+N32 UWEZO_KESI = 1048576;
+
+// Unganisha `jina` + `kiambishi` kwenye `bafa` (mfuatano_umbiza haikubali
+// vielekezi kama hoja za %s, kwa hiyo tunanakili kwa mkono).
+N8* jina_na(N8* bafa, N8* jina, N8* kiambishi) {
+    N32 a = urefu_wa_mfuatano(jina);
+    nakili(bafa, jina, a);
+    N32 b = urefu_wa_mfuatano(kiambishi);
+    nakili(bafa + a, kiambishi, b);
+    bafa[a + b] = 0;
+    rudisha bafa;
+}
+
+W0 thibitisha_bafa(N8* p, N8* jina) {
+    N32 sawa = 0;
+    kama (p != 0) { sawa = 1; }
+    thibitisha(sawa, jina);
+}
+
+// Rudisha 1 kama `a` na `b` ni mfuatano ule ule.
+N32 sawa_mfuatano(N8* a, N8* b) {
+    kama (a == 0 || b == 0) { rudisha 0; }
+    kama (linganisha_mfuatano(a, b) == 0) { rudisha 1; }
+    rudisha 0;
+}
+
+// Thibitisha kuwa JSON sahihi `v` inaandikwa na kusomwa tena bila mabadiliko.
+W0 thibitisha_uandishi_upya(Json* v, N8* jina) {
+    N8 ujumbe[512];
+    N8* s1 = json_hadi_mfuatano(v);
+    thibitisha_bafa(s1, jina);
+    kama (s1 == 0) { rudisha; }
+
+    JsonKosa k2;
+    Json* v2 = json_changanua(s1, &k2);
+    jina_na(ujumbe, jina, ": matokeo ya compact yanasomeka tena");
+    thibitisha_si_tupu(v2, ujumbe);
+    kama (v2 == 0) { rudisha; }
+
+    N8* s2 = json_hadi_mfuatano(v2);
+    jina_na(ujumbe, jina, ": compact ni fixpoint");
+    thibitisha(sawa_mfuatano(s1, s2), ujumbe);
+
+    N8* p = json_hadi_mfuatano_mzuri(v, 2);
+    jina_na(ujumbe, jina, ": pretty imeandikwa");
+    thibitisha_bafa(p, ujumbe);
+    kama (p == 0) { rudisha; }
+    JsonKosa k3;
+    Json* v3 = json_changanua(p, &k3);
+    jina_na(ujumbe, jina, ": pretty inasomeka tena");
+    thibitisha_si_tupu(v3, ujumbe);
+    kama (v3 == 0) { rudisha; }
+    jina_na(ujumbe, jina, ": pretty na compact zinawakilisha thamani ile ile");
+    thibitisha(sawa_mfuatano(json_hadi_mfuatano(v3), s1), ujumbe);
+    jina_na(ujumbe, jina, ": json_sawa(v, v3)");
+    thibitisha(json_sawa(v, v3), ujumbe);
+}
+
+N32 main() {
+    N8* orodha = tenga(UWEZO_ORODHA);
+    N64 n_orodha = faili_soma_yote("jaribio/corpus/ORODHA.txt", orodha, UWEZO_ORODHA);
+    thibitisha(n_orodha > 0, "corpus: ORODHA.txt imesomwa");
+    kama (n_orodha <= 0) { rudisha jaribio_mwisho(); }
+
+    N8* data = tenga(UWEZO_KESI);
+    N8 njia[256];
+    N8 jina[128];
+    N8 ujumbe[512];
+    N32 kesi = 0;
+    N32 sahihi = 0;
+    N32 batili = 0;
+
+    N64 p = 0;
+    wakati (p < n_orodha) {
+        // Mstari: <y|n> <jina la faili>\n
+        N32 aina_kesi = orodha[p];
+        N64 mwanzo = p + 2;
+        N64 mwisho = mwanzo;
+        wakati (mwisho < n_orodha && orodha[mwisho] != 10) { mwisho = mwisho + 1; }
+        N64 ur = mwisho - mwanzo;
+        kama (ur > 0 && ur < 127) {
+            nakili(jina, orodha + mwanzo, ur);
+            jina[ur] = 0;
+            jina_na(njia, "jaribio/corpus/", jina);
+
+            N64 n = faili_soma_yote(njia, data, UWEZO_KESI);
+            jina_na(ujumbe, jina, ": faili linasomeka");
+            thibitisha(n >= 0, ujumbe);
+            kama (n >= 0) {
+                JsonKosa kosa;
+                Json* v = json_changanua_n(data, n, &kosa);
+                kesi = kesi + 1;
+                kama (aina_kesi == 121) {         // 'y'
+                    sahihi = sahihi + 1;
+                    jina_na(ujumbe, jina, ": (y) lazima ikubaliwe");
+                    thibitisha_si_tupu(v, ujumbe);
+                    kama (v != 0) { thibitisha_uandishi_upya(v, jina); }
+                    // Kesi iliyokubaliwa: ujumbe wa kosa haupaswi kuhitajika.
+                } sivyo {
+                    batili = batili + 1;
+                    jina_na(ujumbe, jina, ": (n) lazima ikataliwe");
+                    thibitisha_tupu(v, ujumbe);
+                    kama (v == 0) {
+                        // Kesi iliyokataliwa lazima itoe ujumbe wenye mstari/safu.
+                        N8 uj[512];
+                        json_ujumbe_wa_kosa(&kosa, uj, 512);
+                        jina_na(ujumbe, jina, ": ujumbe wa kosa haupo");
+                        thibitisha(urefu_wa_mfuatano(uj) > 0, ujumbe);
+                    }
+                }
+            }
+        }
+        p = mwisho + 1;
+    }
+
+    // Hakikisha ORODHA.txt haikusomwa vibaya (idadi inayotarajiwa ya kesi).
+    thibitisha_n32(sahihi, 43, "corpus: idadi ya kesi za y_");
+    thibitisha_n32(batili, 64, "corpus: idadi ya kesi za n_");
+    andika("corpus: kesi %d (sahihi %d, batili %d)\n", kesi, sahihi, batili, 0, 0, 0);
+    rudisha jaribio_mwisho();
+}
