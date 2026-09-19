@@ -1,0 +1,167 @@
+// jaribio_makosa.swa -- JSON isiyo sahihi lazima ikataliwe (kamwe
+// isirudishe thamani), na kosa liripoti nafasi/mstari/safu sahihi.
+
+// Ingizo lazima likataliwe.
+W0 kataa(N8* ingizo, N8* jina) {
+    JsonKosa kosa;
+    Json* v = json_changanua(ingizo, &kosa);
+    N32 imekataliwa = 0;
+    kama (v == 0) { imekataliwa = 1; }
+    thibitisha(imekataliwa, jina);
+    thibitisha_n32(kosa.msimbo, 1, jina);
+}
+
+// Ingizo lazima likataliwe kwenye mstari/safu maalum.
+W0 kataa_mahali(N8* ingizo, N32 mstari, N32 safu, N32 nafasi, N8* jina) {
+    JsonKosa kosa;
+    Json* v = json_changanua(ingizo, &kosa);
+    N32 imekataliwa = 0;
+    kama (v == 0) { imekataliwa = 1; }
+    thibitisha(imekataliwa, jina);
+    thibitisha_n32(kosa.mstari, mstari, jina);
+    thibitisha_n32(kosa.safu, safu, jina);
+    thibitisha_n32(kosa.nafasi, nafasi, jina);
+}
+
+N32 main() {
+    // ---- Vitu na orodha zilizovunjika ----
+    kataa("", "tupu");
+    kataa("   \n\t ", "nafasi tupu tu");
+    kataa("[", "orodha haijafungwa");
+    kataa("{", "kitu hakijafungwa");
+    kataa("]", "] pekee");
+    kataa("}", "} pekee");
+    kataa("[1,]", "koma ya mwisho kwenye orodha");
+    kataa("[,1]", "koma ya mwanzo kwenye orodha");
+    kataa("[1 2]", "hakuna koma kwenye orodha");
+    kataa("[1,2", "orodha haijafungwa baada ya vipengele");
+    kataa("{\"a\":1,}", "koma ya mwisho kwenye kitu");
+    kataa("{\"a\":1", "kitu hakijafungwa baada ya jozi");
+    kataa("{a:1}", "ufunguo bila nukuu");
+    kataa("{'a':1}", "ufunguo kwa nukuu moja");
+    kataa("{\"a\" 1}", "hakuna ':'");
+    kataa("{\"a\":}", "thamani inakosekana");
+    kataa("{\"a\"}", "':' na thamani vinakosekana");
+    kataa("{1:2}", "ufunguo ni nambari");
+    kataa("{\"a\":1 \"b\":2}", "hakuna koma kwenye kitu");
+
+    // ---- Literals ----
+    kataa("nul", "nul");
+    kataa("tru", "tru");
+    kataa("tRue", "tRue");
+    kataa("True", "True");
+    kataa("NaN", "NaN");
+    kataa("Infinity", "Infinity");
+    kataa("undefined", "undefined");
+
+    // ---- Nambari ----
+    kataa("01", "sifuri ya mwanzo (01)");
+    kataa("-01", "sifuri ya mwanzo (-01)");
+    kataa("-", "alama ya kutoa pekee");
+    kataa("+1", "alama ya kujumlisha");
+    kataa(".5", "nukta ya mwanzo");
+    kataa("1.", "nukta ya mwisho");
+    kataa("1.e2", "hakuna tarakimu baada ya nukta");
+    kataa("1e", "kipeo tupu");
+    kataa("1e+", "kipeo chenye alama tu");
+    kataa("--1", "kutoa mara mbili");
+    kataa("0x10", "heksadesimali");
+    kataa("1_000", "underscore");
+    kataa("[1.2.3]", "nukta mbili");
+
+    // ---- Mfuatano ----
+    kataa("\"abc", "mfuatano haujafungwa");
+    kataa("\"abc\\", "mfuatano unaishia na backslash");
+    kataa("'abc'", "nukuu moja");
+    kataa("\"a\nb\"", "mstari mpya ghafi ndani ya mfuatano");
+    kataa("\"a\tb\"", "tab ghafi ndani ya mfuatano");
+    kataa("\"\\q\"", "escape isiyojulikana \\q");
+    kataa("\"\\x41\"", "escape \\x haiko kwenye JSON");
+    kataa("\"\\u12\"", "\\u fupi");
+    kataa("\"\\u12G4\"", "\\u yenye herufi isiyo hex");
+    kataa("\"\\uD800\"", "surrogate ya juu peke yake");
+    kataa("\"\\uD800x\"", "surrogate ya juu ikifuatwa na herufi");
+    kataa("\"\\uD800\\u0041\"", "surrogate ya juu ikifuatwa na \\u isiyo ya chini");
+    kataa("\"\\uDC00\"", "surrogate ya chini peke yake");
+    kataa("\"\\u0000\"", "\\u0000");
+
+    // ---- Maandishi ya ziada ----
+    kataa("[1] x", "maandishi baada ya orodha");
+    kataa("{} {}", "thamani mbili");
+    kataa("1 2", "nambari mbili");
+    kataa("null null", "null mbili");
+    kataa("truex", "true ikifuatwa na herufi");
+
+    // ---- Mahali sahihi pa kosa ----
+    kataa_mahali("{\"a\": 1,\n  \"b\": ?}", 2, 8, 16, "? kwenye mstari wa 2");
+    kataa_mahali("[1, 2, x]", 1, 8, 7, "x kwenye orodha");
+    kataa_mahali("\"abc", 1, 5, 4, "mfuatano haujafungwa: mwisho wa maandishi");
+    kataa_mahali("[1] x", 1, 5, 4, "maandishi ya ziada");
+    kataa_mahali("[1,\n2,\n3,\n]", 4, 1, 10, "koma ya mwisho: ] kwenye mstari wa 4");
+    kataa_mahali("{\"a\":1 \"b\":2}", 1, 8, 7, "koma inakosekana kwenye kitu");
+    kataa_mahali("  01", 1, 4, 3, "sifuri ya mwanzo: tarakimu ya pili");
+
+    // ---- Ujumbe wa kosa uliopangwa ----
+    JsonKosa k;
+    Json* v = json_changanua("{\"a\": 1,\n  \"b\": ?}", &k);
+    thibitisha_tupu(v, "ujumbe: imekataliwa");
+    N8 bafa[256];
+    N64 n = json_ujumbe_wa_kosa(&k, bafa, 256);
+    thibitisha_mfuatano(bafa, "kosa la JSON: herufi isiyotarajiwa (thamani ya JSON inatarajiwa) (mstari 2, safu 8, nafasi 16)", "ujumbe wa kosa uliopangwa");
+    thibitisha_n32(n, 94, "ujumbe: idadi ya baiti");
+    // Bafa ndogo inakatwa bila kufurika.
+    N8 ndogo[12];
+    N64 n2 = json_ujumbe_wa_kosa(&k, ndogo, 12);
+    thibitisha_n32(n2, 11, "ujumbe: unakatwa kwa bafa ndogo");
+    thibitisha_mfuatano(ndogo, "kosa la JSO", "ujumbe: maandishi yaliyokatwa");
+
+    // ---- Kosa linawekwa upya kwa kila mwito ----
+    Json* sawa = json_changanua("[1]", &k);
+    thibitisha_si_tupu(sawa, "kosa linawekwa upya: mafanikio baada ya kosa");
+    thibitisha_n32(k.msimbo, 0, "kosa linawekwa upya: msimbo 0");
+
+    // ---- Kina cha nesting: 512 sawa, 513 kimekataliwa ----
+    N8* kina = tenga(4096);
+    N32 i = 0;
+    wakati (i < 512) { kina[i] = 91; i = i + 1; }
+    wakati (i < 1024) { kina[i] = 93; i = i + 1; }
+    kina[1024] = 0;
+    Json* d512 = json_changanua(kina, &k);
+    thibitisha_si_tupu(d512, "kina 512 kinakubaliwa");
+    N32 kina_halisi = 0;
+    Json* sasa = d512;
+    wakati (json_aina(sasa) == JSON_ORODHA && json_urefu(sasa) == 1) {
+        sasa = json_kipengele(sasa, 0);
+        kina_halisi = kina_halisi + 1;
+    }
+    thibitisha_n32(kina_halisi, 511, "kina 512: orodha 511 zimeundwa ndani ya moja");
+
+    N8* kina2 = tenga(4096);
+    i = 0;
+    wakati (i < 513) { kina2[i] = 91; i = i + 1; }
+    wakati (i < 1026) { kina2[i] = 93; i = i + 1; }
+    kina2[1026] = 0;
+    Json* d513 = json_changanua(kina2, &k);
+    thibitisha_tupu(d513, "kina 513 kinakataliwa");
+    thibitisha_n32(k.msimbo, 1, "kina 513: msimbo wa kosa");
+    thibitisha_mfuatano(k.ujumbe, "kina cha nesting kimezidi kikomo (512)", "kina 513: ujumbe");
+
+    // Kina cha vitu (kitu ndani ya kitu ndani ya ...)
+    N8* vk = tenga(8192);
+    N32 w = 0;
+    i = 0;
+    wakati (i < 513) {
+        vk[w] = 123; vk[w + 1] = 34; vk[w + 2] = 97; vk[w + 3] = 34; vk[w + 4] = 58;  // {"a":
+        w = w + 5;
+        i = i + 1;
+    }
+    vk[w] = 49;  // 1
+    w = w + 1;
+    i = 0;
+    wakati (i < 513) { vk[w] = 125; w = w + 1; i = i + 1; }
+    vk[w] = 0;
+    Json* dk = json_changanua(vk, &k);
+    thibitisha_tupu(dk, "kina cha vitu 513 kinakataliwa");
+
+    rudisha jaribio_mwisho();
+}
