@@ -550,6 +550,17 @@ D64 json_thamani_ya_nambari(N8* s) {
     }
     kama (mant == 0) { rudisha 0.0; }
     D64 x = mant;
+    // Kupima kwa hatua (10^200 kwa wakati mmoja) ili 10^k isizidi D64
+    // wakati matokeo yenyewe bado yanawakilishika (mf. 2.2250738585072014e-308
+    // ina kipeo -324).
+    wakati (kipeo > 200) {
+        x = x * json_p10(200);
+        kipeo = kipeo - 200;
+    }
+    wakati (kipeo < -200) {
+        x = x / json_p10(200);
+        kipeo = kipeo + 200;
+    }
     kama (kipeo > 0) {
         x = x * json_p10(kipeo);
     }
@@ -946,24 +957,26 @@ W0 json_andika_herufi(JsonBafa* b, N8* s) {
 // Panga nambari ya D64 (tarakimu 15 za maana, sawa na "%.15g"):
 //  * kipeo cha desimali e kati ya -5 na 14 -> nukuu ya kawaida (0.00012, 123.5, 100000)
 //  * vinginevyo -> nukuu ya kisayansi (1.5e+20, 1e-7), halali kwa JSON.
-// Nambari isiyo na mwisho / kubwa kupita 1e300 / NaN -> "null" (kama
-// JSON.stringify ya JavaScript).
+// Nambari isiyo na mwisho (na NaN) -> "null" (kama JSON.stringify ya
+// JavaScript); thamani zote za mwisho hadi DBL_MAX zinaandikwa.
 W0 json_andika_d64(JsonBafa* b, D64 x) {
     D64 a = x;
     kama (x < 0.0) { a = 0.0 - x; }
-    kama (a > json_p10(300)) {
-        json_bafa_mfuatano(b, "null");
-        rudisha;
-    }
     kama (a == 0.0) {
         json_bafa_baiti(b, 48);
+        rudisha;
+    }
+    // a*0.5 == a kwa nambari isiyo sifuri ni kweli TU kwa isiyo na mwisho
+    // (na NaN) -- kipimo sahihi kabisa cha "finite" bila kikomo cha kubuni.
+    kama (a * 0.5 == a) {
+        json_bafa_mfuatano(b, "null");
         rudisha;
     }
     // Kipeo e: 10^e <= a < 10^(e+1) (makadirio; yanarekebishwa hapa chini).
     N32 e = 0;
     D64 p = 1.0;
     kama (a >= 1.0) {
-        wakati (p * 10.0 <= a && e < 300) {
+        wakati (p * 10.0 <= a && e < 309) {
             p = p * 10.0;
             e = e + 1;
         }

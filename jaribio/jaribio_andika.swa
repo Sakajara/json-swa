@@ -77,6 +77,9 @@ N32 main() {
     dhibitisha_nambari(json_p10(22) * 1.5, "1.5e+22", "d64: 1.5e22");
     dhibitisha_nambari(0.0 - json_p10(10), "-10000000000", "d64: -1e10");
     dhibitisha_nambari(json_p10(400), "null", "d64: isiyo na mwisho -> null");
+    dhibitisha_nambari(json_p10(300) * 1.7, "1.7e+300", "d64: 1.7e300 (bado halali)");
+    dhibitisha_nambari(json_p10(308) * 1.5, "1.5e+308", "d64: 1.5e308 (karibu na kikomo cha D64)");
+    dhibitisha_nambari(json_p10(308) * 1.797, "1.797e+308", "d64: 1.797e308 (karibu na DBL_MAX)");
     dhibitisha_nambari(0.0 - json_p10(400), "null", "d64: hasi isiyo na mwisho -> null");
 
     // ---- Pretty ----
