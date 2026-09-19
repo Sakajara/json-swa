@@ -1,0 +1,67 @@
+// jaribio_thamani.swa -- uwakilishi wa thamani, vijenzi na vifikiaji.
+
+N32 main() {
+    Json* n = json_null();
+    thibitisha_n32(json_aina(n), JSON_NULL, "null: aina");
+
+    Json* t = json_bool(5);
+    Json* f = json_bool(0);
+    thibitisha_n32(json_thamani_bool(t), 1, "bool: kweli (5 -> 1)");
+    thibitisha_n32(json_thamani_bool(f), 0, "bool: sivyo");
+
+    Json* x = json_nambari(2.5);
+    thibitisha_n32(json_aina(x), JSON_NAMBARI, "nambari: aina");
+    thibitisha(json_thamani_nambari(x) == 2.5, "nambari: thamani 2.5");
+
+    N8* asili = "habari";
+    Json* s = json_mfuatano(asili);
+    thibitisha_mfuatano(json_thamani_mfuatano(s), "habari", "mfuatano: thamani");
+    thibitisha_n32(json_urefu(s), 6, "mfuatano: urefu");
+    thibitisha_vielekezi_tofauti(json_thamani_mfuatano(s), asili, "mfuatano: umenakiliwa");
+
+    // Orodha inayokua zaidi ya uwezo wa awali (4) -- vipengele 100.
+    Json* o = json_orodha();
+    N32 i = 0;
+    wakati (i < 100) {
+        thibitisha(json_orodha_ongeza(o, json_nambari(i * 1.0)) == 1, "orodha: ongeza");
+        i = i + 1;
+    }
+    thibitisha_n32(json_urefu(o), 100, "orodha: urefu 100");
+    thibitisha(json_thamani_nambari(json_kipengele(o, 0)) == 0.0, "orodha: kipengele 0");
+    thibitisha(json_thamani_nambari(json_kipengele(o, 57)) == 57.0, "orodha: kipengele 57");
+    thibitisha(json_thamani_nambari(json_kipengele(o, 99)) == 99.0, "orodha: kipengele 99");
+    thibitisha_tupu(json_kipengele(o, 100), "orodha: nje ya mipaka (100)");
+    thibitisha_tupu(json_kipengele(o, -1), "orodha: nje ya mipaka (-1)");
+    thibitisha_tupu(json_kipengele(x, 0), "kipengele kwa aina isiyo orodha");
+
+    // Kitu: kuweka, kupata, kubadilisha mahali, kukua.
+    Json* k = json_kitu();
+    thibitisha(json_kitu_weka(k, "a", json_nambari(1.0)) == 1, "kitu: weka a");
+    thibitisha(json_kitu_weka(k, "b", json_nambari(2.0)) == 1, "kitu: weka b");
+    thibitisha(json_kitu_weka(k, "a", json_nambari(9.0)) == 1, "kitu: badilisha a");
+    thibitisha_n32(json_urefu(k), 2, "kitu: idadi 2 baada ya kubadilisha");
+    thibitisha(json_thamani_nambari(json_pata(k, "a")) == 9.0, "kitu: a = 9 (mwisho unashinda)");
+    thibitisha(json_thamani_nambari(json_pata(k, "b")) == 2.0, "kitu: b = 2");
+    thibitisha_tupu(json_pata(k, "c"), "kitu: c haipo");
+    thibitisha_mfuatano(json_ufunguo_wa(k, 0), "a", "kitu: ufunguo wa kwanza ni a");
+    thibitisha_mfuatano(json_ufunguo_wa(k, 1), "b", "kitu: ufunguo wa pili ni b");
+    thibitisha_tupu(json_ufunguo_wa(k, 2), "kitu: ufunguo nje ya mipaka");
+    thibitisha_tupu(json_pata(o, "a"), "pata kwa aina isiyo kitu");
+
+    Json* kubwa = json_kitu();
+    N8 jina[16];
+    i = 0;
+    wakati (i < 50) {
+        jina[0] = 107;  // 'k'
+        jina[1] = 48 + (i / 10);
+        jina[2] = 48 + (i % 10);
+        jina[3] = 0;
+        json_kitu_weka(kubwa, jina, json_nambari(i * 10.0));
+        i = i + 1;
+    }
+    thibitisha_n32(json_urefu(kubwa), 50, "kitu kikubwa: idadi 50");
+    thibitisha(json_thamani_nambari(json_pata(kubwa, "k37")) == 370.0, "kitu kikubwa: k37 = 370");
+    thibitisha(json_thamani_nambari(json_pata(kubwa, "k00")) == 0.0, "kitu kikubwa: k00 = 0");
+
+    rudisha jaribio_mwisho();
+}

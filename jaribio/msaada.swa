@@ -1,0 +1,62 @@
+// msaada.swa -- kazi za msaada kwa majaribio (zinaunganishwa mbele ya
+// kila faili la jaribio na jaribu.sh, baada ya json.swa).
+
+N32 jaribio_jumla = 0;
+N32 jaribio_kosa = 0;
+
+W0 thibitisha(N32 sharti, N8* jina) {
+    jaribio_jumla = jaribio_jumla + 1;
+    kama (sharti == 0) {
+        jaribio_kosa = jaribio_kosa + 1;
+        andika("SHINDWA: %s\n", jina, 0, 0, 0, 0, 0);
+    }
+}
+
+W0 thibitisha_n32(N32 halisi, N32 tarajiwa, N8* jina) {
+    jaribio_jumla = jaribio_jumla + 1;
+    kama (halisi != tarajiwa) {
+        jaribio_kosa = jaribio_kosa + 1;
+        andika("SHINDWA: %s (halisi=%d, tarajiwa=%d)\n", jina, halisi, tarajiwa, 0, 0, 0);
+    }
+}
+
+W0 thibitisha_mfuatano(N8* halisi, N8* tarajiwa, N8* jina) {
+    jaribio_jumla = jaribio_jumla + 1;
+    kama (halisi == 0) {
+        jaribio_kosa = jaribio_kosa + 1;
+        andika("SHINDWA: %s (halisi ni tupu/0)\n", jina, 0, 0, 0, 0, 0);
+        rudisha;
+    }
+    kama (linganisha_mfuatano(halisi, tarajiwa) != 0) {
+        jaribio_kosa = jaribio_kosa + 1;
+        andika("SHINDWA: %s\n  halisi:   %s\n  tarajiwa: %s\n", jina, halisi, tarajiwa, 0, 0, 0);
+    }
+}
+
+// Ulinganisho wa vielekezi hauwezi kupitishwa moja kwa moja kama hoja ya
+// N32 (mkusanyaji unaipa usemi wa kielekezi aina ya kielekezi), kwa
+// hiyo tunalinganisha ndani ya `kama` na kupitisha N32.
+W0 thibitisha_tupu(Json* v, N8* jina) {
+    N32 sawa = 0;
+    kama (v == 0) { sawa = 1; }
+    thibitisha(sawa, jina);
+}
+
+W0 thibitisha_si_tupu(Json* v, N8* jina) {
+    N32 sawa = 0;
+    kama (v != 0) { sawa = 1; }
+    thibitisha(sawa, jina);
+}
+
+W0 thibitisha_vielekezi_tofauti(N8* a, N8* b, N8* jina) {
+    N32 sawa = 0;
+    kama (a != b) { sawa = 1; }
+    thibitisha(sawa, jina);
+}
+
+// Rudisha msimbo wa kutoka wa programu: 0 kama yote yamefaulu.
+N32 jaribio_mwisho() {
+    andika("ukaguzi %d, walioshindwa %d\n", jaribio_jumla, jaribio_kosa, 0, 0, 0, 0);
+    kama (jaribio_kosa > 0) { rudisha 1; }
+    rudisha 0;
+}
