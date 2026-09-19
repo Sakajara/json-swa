@@ -251,7 +251,7 @@ Zimeandikwa kwa uwazi -- hakuna zinazofichwa:
 - **UTF-8 haithibitishwi**: baiti `>= 0x80` kwenye mifuatano hupita kama
   zilivyo (RFC 8259 inataka UTF-8 sahihi; vichanganuzi vikali hukataa
   isiyo sahihi). Mifuatano inayotoka `\uXXXX` inatoa UTF-8 sahihi.
-- **` ` na *surrogate* isiyo na jozi** (`\ud800` peke yake) zinakataliwa,
+- **`\u0000` na *surrogate* isiyo na jozi** (`\ud800` peke yake) zinakataliwa,
   ingawa RFC 8259 inaziruhusu kisintaksia (mifuatano ya Swa inaishia kwa NUL;
   surrogate pekee haina herufi halali).
 - **Kina cha juu cha nesting ni 512** wakati wa kuchanganua na **4096** wakati
@@ -283,7 +283,7 @@ muda kwa kila jaribio, ili kuning'inia kuhesabiwe kama kushindwa):
 **Kuhusu corpus**: matarajio ya kila kesi yanatoka kwenye RFC 8259, si kutoka
 kwa tabia ya kichanganuzi hiki; mtindo ni wa JSONTestSuite (`y_` = lazima
 ikubaliwe, `n_` = lazima ikataliwe). Kesi zilizo na majibu yanayotegemea
-utekelezaji (` `, surrogate pekee, UTF-8 batili) hazimo -- ni
+utekelezaji (`\u0000`, surrogate pekee, UTF-8 batili) hazimo -- ni
 [mipaka](#mipaka-inayojulikana) iliyoandikwa.
 
 **Kuhusu fuzz**: kwa mbegu inayojulikana (linajirudia kabisa), kila kesi
