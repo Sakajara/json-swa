@@ -18,30 +18,30 @@
 // Matumizi:  ./.jenga/jaribio_fuzz [mbegu] [idadi]
 
 // ---- jenereta ya nasibu (LCG; Swa safi, si nasibu.swa ambayo inatumia libc) ----
-N64 fz_hali = 20260919;
+n64 fz_hali = 20260919;
 
-N32 fz_n(N32 upeo) {
+n32 fz_n(n32 upeo) {
     fz_hali = (fz_hali * 1103515245 + 12345) % 2147483648;
-    N64 juu = fz_hali / 65536;
+    n64 juu = fz_hali / 65536;
     rudisha juu % upeo;
 }
 
 // Nambari nasibu katika [0, upeo) kwa upeo hadi ~1e9.
-N32 fz_kubwa(N32 upeo) {
-    N32 a = fz_n(32768);
-    N32 b = fz_n(32768);
+n32 fz_kubwa(n32 upeo) {
+    n32 a = fz_n(32768);
+    n32 b = fz_n(32768);
     rudisha (a * 32768 + b) % upeo;
 }
 
 // ---- kuzalisha thamani ----
-N8* fz_mfuatano() {
-    N32 ur = fz_n(14);
-    N8* b = tenga(ur * 4 + 1);
+n8* fz_mfuatano() {
+    n32 ur = fz_n(14);
+    n8* b = tenga(ur * 4 + 1);
     kama (b == 0) { rudisha 0; }
-    N32 w = 0;
-    N32 i = 0;
+    n32 w = 0;
+    n32 i = 0;
     wakati (i < ur) {
-        N32 c = fz_n(12);
+        n32 c = fz_n(12);
         kama (c == 0) { b[w] = 34; w = w + 1; }
         sivyo { kama (c == 1) { b[w] = 92; w = w + 1; }
         sivyo { kama (c == 2) { b[w] = 1 + fz_n(31); w = w + 1; }
@@ -57,29 +57,29 @@ N8* fz_mfuatano() {
     rudisha b;
 }
 
-Json* fz_thamani(N32 kina) {
-    N32 r = 0;
+Json* fz_thamani(n32 kina) {
+    n32 r = 0;
     kama (kina > 0) { r = fz_n(10); } sivyo { r = fz_n(6); }
     kama (r == 0) { rudisha json_null(); }
     kama (r == 1) { rudisha json_bool(fz_n(2)); }
     kama (r == 2) {
-        D64 d = fz_kubwa(2000001) - 1000000;
+        d64 d = fz_kubwa(2000001) - 1000000;
         rudisha json_nambari(d);
     }
     kama (r == 3) {
-        D64 a = fz_kubwa(2000001) - 1000000;
+        d64 a = fz_kubwa(2000001) - 1000000;
         rudisha json_nambari(a / 1000.0);
     }
     kama (r == 4 || r == 5) {
-        N8* s = fz_mfuatano();
+        n8* s = fz_mfuatano();
         kama (s == 0) { rudisha 0; }
         rudisha json_mfuatano(s);
     }
     kama (r == 6 || r == 7) {
         Json* o = json_orodha();
         kama (o == 0) { rudisha 0; }
-        N32 n = fz_n(5);
-        N32 i = 0;
+        n32 n = fz_n(5);
+        n32 i = 0;
         wakati (i < n) {
             json_orodha_ongeza(o, fz_thamani(kina - 1));
             i = i + 1;
@@ -88,10 +88,10 @@ Json* fz_thamani(N32 kina) {
     }
     Json* k = json_kitu();
     kama (k == 0) { rudisha 0; }
-    N32 n2 = fz_n(5);
-    N32 j = 0;
+    n32 n2 = fz_n(5);
+    n32 j = 0;
     wakati (j < n2) {
-        N8* ufunguo = fz_mfuatano();
+        n8* ufunguo = fz_mfuatano();
         kama (ufunguo != 0) { json_kitu_weka(k, ufunguo, fz_thamani(kina - 1)); }
         j = j + 1;
     }
@@ -99,12 +99,12 @@ Json* fz_thamani(N32 kina) {
 }
 
 // ---- ulinganifu wa thamani (nambari kwa makosa madogo, vingine kabisa) ----
-D64 fz_abs(D64 x) {
+d64 fz_abs(d64 x) {
     kama (x < 0.0) { rudisha 0.0 - x; }
     rudisha x;
 }
 
-N32 fz_sawa(Json* a, Json* b) {
+n32 fz_sawa(Json* a, Json* b) {
     kama (a->aina != b->aina) { rudisha 0; }
     kama (a->aina == JSON_NULL) { rudisha 1; }
     kama (a->aina == JSON_BOOL) {
@@ -112,9 +112,9 @@ N32 fz_sawa(Json* a, Json* b) {
         rudisha 0;
     }
     kama (a->aina == JSON_NAMBARI) {
-        D64 x = a->nambari;
-        D64 y = b->nambari;
-        D64 t = 1.0;
+        d64 x = a->nambari;
+        d64 y = b->nambari;
+        d64 t = 1.0;
         kama (fz_abs(x) > t) { t = fz_abs(x); }
         kama (fz_abs(y) > t) { t = fz_abs(y); }
         kama (fz_abs(x - y) <= t / 1000000000000.0) { rudisha 1; }
@@ -125,7 +125,7 @@ N32 fz_sawa(Json* a, Json* b) {
         rudisha 0;
     }
     kama (a->idadi != b->idadi) { rudisha 0; }
-    N32 i = 0;
+    n32 i = 0;
     wakati (i < a->idadi) {
         Json* mwenzake = b->vipengele[i];
         kama (a->aina == JSON_KITU) {
@@ -138,39 +138,39 @@ N32 fz_sawa(Json* a, Json* b) {
     rudisha 1;
 }
 
-W0 thibitisha_bafa(N8* p, N8* jina) {
-    N32 sawa = 0;
+w0 thibitisha_bafa(n8* p, n8* jina) {
+    n32 sawa = 0;
     kama (p != 0) { sawa = 1; }
     thibitisha(sawa, jina);
 }
 
-N32 sawa_mfuatano(N8* a, N8* b) {
+n32 sawa_mfuatano(n8* a, n8* b) {
     kama (a == 0 || b == 0) { rudisha 0; }
     kama (linganisha_mfuatano(a, b) == 0) { rudisha 1; }
     rudisha 0;
 }
 
 // ---- kuharibu ingizo ----
-N8* fz_mutasi(N8* s, N32 ur, N32* mpya_ur) {
-    N8* m = tenga(ur + 8);
+n8* fz_mutasi(n8* s, n32 ur, n32* mpya_ur) {
+    n8* m = tenga(ur + 8);
     kama (m == 0) { *mpya_ur = 0; rudisha 0; }
     nakili(m, s, ur);
-    N32 n = ur;
-    N32 ops = 1 + fz_n(3);
-    N32 k = 0;
+    n32 n = ur;
+    n32 ops = 1 + fz_n(3);
+    n32 k = 0;
     wakati (k < ops) {
-        N32 op = fz_n(4);
+        n32 op = fz_n(4);
         kama (op == 0 && n > 0) {
             m[fz_n(n)] = fz_n(256);
         }
         kama (op == 1 && n > 0) {
-            N32 pos = fz_n(n);
+            n32 pos = fz_n(n);
             wakati (pos + 1 < n) { m[pos] = m[pos + 1]; pos = pos + 1; }
             n = n - 1;
         }
         kama (op == 2) {
-            N32 pos2 = fz_n(n + 1);
-            N32 q = n;
+            n32 pos2 = fz_n(n + 1);
+            n32 q = n;
             wakati (q > pos2) { m[q] = m[q - 1]; q = q - 1; }
             m[pos2] = fz_n(256);
             n = n + 1;
@@ -184,27 +184,27 @@ N8* fz_mutasi(N8* s, N32 ur, N32* mpya_ur) {
     rudisha m;
 }
 
-N32 fz_zilizoonyeshwa = 0;
+n32 fz_zilizoonyeshwa = 0;
 
-W0 fz_onyesha(N8* ingizo) {
+w0 fz_onyesha(n8* ingizo) {
     kama (fz_zilizoonyeshwa < 5) {
         andika("  ingizo: %s\n", ingizo, 0, 0, 0, 0, 0);
         fz_zilizoonyeshwa = fz_zilizoonyeshwa + 1;
     }
 }
 
-N32 main(N32 argc, N8** argv) {
-    N32 mbegu = 20260919;
-    N32 idadi = 1500;
+n32 main(n32 argc, n8** argv) {
+    n32 mbegu = 20260919;
+    n32 idadi = 1500;
     kama (argc > 1) { mbegu = mfuatano_hadi_n32(argv[1]); }
     kama (argc > 2) { idadi = mfuatano_hadi_n32(argv[2]); }
     fz_hali = mbegu;
     andika("fuzz: mbegu=%d idadi=%d\n", mbegu, idadi, 0, 0, 0, 0);
 
-    N8 jina[256];
-    N32 kubaliwa = 0;
-    N32 kataliwa = 0;
-    N32 i = 0;
+    n8 jina[256];
+    n32 kubaliwa = 0;
+    n32 kataliwa = 0;
+    n32 i = 0;
     wakati (i < idadi) {
         Json* v = fz_thamani(4);
         mfuatano_umbiza(jina, 256, "fuzz #%d: thamani imezalishwa", i, 0, 0, 0, 0, 0);
@@ -212,7 +212,7 @@ N32 main(N32 argc, N8** argv) {
         kama (v == 0) { i = i + 1; endelea; }
 
         // (1) compact
-        N8* s1 = json_hadi_mfuatano(v);
+        n8* s1 = json_hadi_mfuatano(v);
         mfuatano_umbiza(jina, 256, "fuzz #%d: compact imeandikwa", i, 0, 0, 0, 0, 0);
         thibitisha_bafa(s1, jina);
         kama (s1 == 0) { i = i + 1; endelea; }
@@ -227,7 +227,7 @@ N32 main(N32 argc, N8** argv) {
         thibitisha(sawa_mfuatano(json_hadi_mfuatano(v2), s1), jina);
 
         // (2) pretty
-        N8* p = json_hadi_mfuatano_mzuri(v, 2);
+        n8* p = json_hadi_mfuatano_mzuri(v, 2);
         mfuatano_umbiza(jina, 256, "fuzz #%d: pretty imeandikwa", i, 0, 0, 0, 0, 0);
         thibitisha_bafa(p, jina);
         kama (p != 0) {
@@ -244,23 +244,23 @@ N32 main(N32 argc, N8** argv) {
         }
 
         // (3) mutation
-        N32 ur = urefu_wa_mfuatano(s1);
-        N32 m = 0;
+        n32 ur = urefu_wa_mfuatano(s1);
+        n32 m = 0;
         wakati (m < 4) {
-            N32 mur = 0;
-            N8* mz = fz_mutasi(s1, ur, &mur);
+            n32 mur = 0;
+            n8* mz = fz_mutasi(s1, ur, &mur);
             kama (mz != 0) {
                 JsonKosa km;
                 Json* w = json_changanua_n(mz, mur, &km);
                 kama (w == 0) {
                     kataliwa = kataliwa + 1;
-                    N8 uj[512];
+                    n8 uj[512];
                     json_ujumbe_wa_kosa(&km, uj, 512);
                     mfuatano_umbiza(jina, 256, "fuzz #%d: ingizo lililokataliwa lina ujumbe wa kosa", i, 0, 0, 0, 0, 0);
                     thibitisha(urefu_wa_mfuatano(uj) > 0, jina);
                 } sivyo {
                     kubaliwa = kubaliwa + 1;
-                    N8* t1 = json_hadi_mfuatano(w);
+                    n8* t1 = json_hadi_mfuatano(w);
                     mfuatano_umbiza(jina, 256, "fuzz #%d: ingizo lililokubaliwa linaandikwa upya", i, 0, 0, 0, 0, 0);
                     thibitisha_bafa(t1, jina);
                     kama (t1 != 0) {
