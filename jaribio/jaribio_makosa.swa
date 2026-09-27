@@ -2,20 +2,20 @@
 // isirudishe thamani), na kosa liripoti nafasi/mstari/safu sahihi.
 
 // Ingizo lazima likataliwe.
-W0 kataa(N8* ingizo, N8* jina) {
+w0 kataa(n8* ingizo, n8* jina) {
     JsonKosa kosa;
     Json* v = json_changanua(ingizo, &kosa);
-    N32 imekataliwa = 0;
+    n32 imekataliwa = 0;
     kama (v == 0) { imekataliwa = 1; }
     thibitisha(imekataliwa, jina);
     thibitisha_n32(kosa.msimbo, 1, jina);
 }
 
 // Ingizo lazima likataliwe kwenye mstari/safu maalum.
-W0 kataa_mahali(N8* ingizo, N32 mstari, N32 safu, N32 nafasi, N8* jina) {
+w0 kataa_mahali(n8* ingizo, n32 mstari, n32 safu, n32 nafasi, n8* jina) {
     JsonKosa kosa;
     Json* v = json_changanua(ingizo, &kosa);
-    N32 imekataliwa = 0;
+    n32 imekataliwa = 0;
     kama (v == 0) { imekataliwa = 1; }
     thibitisha(imekataliwa, jina);
     thibitisha_n32(kosa.mstari, mstari, jina);
@@ -23,7 +23,7 @@ W0 kataa_mahali(N8* ingizo, N32 mstari, N32 safu, N32 nafasi, N8* jina) {
     thibitisha_n32(kosa.nafasi, nafasi, jina);
 }
 
-N32 main() {
+n32 main() {
     // ---- Vitu na orodha zilizovunjika ----
     kataa("", "tupu");
     kataa("   \n\t ", "nafasi tupu tu");
@@ -105,13 +105,13 @@ N32 main() {
     JsonKosa k;
     Json* v = json_changanua("{\"a\": 1,\n  \"b\": ?}", &k);
     thibitisha_tupu(v, "ujumbe: imekataliwa");
-    N8 bafa[256];
-    N64 n = json_ujumbe_wa_kosa(&k, bafa, 256);
+    n8 bafa[256];
+    n64 n = json_ujumbe_wa_kosa(&k, bafa, 256);
     thibitisha_mfuatano(bafa, "kosa la JSON: herufi isiyotarajiwa (thamani ya JSON inatarajiwa) (mstari 2, safu 8, nafasi 16)", "ujumbe wa kosa uliopangwa");
     thibitisha_n32(n, 94, "ujumbe: idadi ya baiti");
     // Bafa ndogo inakatwa bila kufurika.
-    N8 ndogo[12];
-    N64 n2 = json_ujumbe_wa_kosa(&k, ndogo, 12);
+    n8 ndogo[12];
+    n64 n2 = json_ujumbe_wa_kosa(&k, ndogo, 12);
     thibitisha_n32(n2, 11, "ujumbe: unakatwa kwa bafa ndogo");
     thibitisha_mfuatano(ndogo, "kosa la JSO", "ujumbe: maandishi yaliyokatwa");
 
@@ -121,14 +121,14 @@ N32 main() {
     thibitisha_n32(k.msimbo, 0, "kosa linawekwa upya: msimbo 0");
 
     // ---- Kina cha nesting: 512 sawa, 513 kimekataliwa ----
-    N8* kina = tenga(4096);
-    N32 i = 0;
+    n8* kina = tenga(4096);
+    n32 i = 0;
     wakati (i < 512) { kina[i] = 91; i = i + 1; }
     wakati (i < 1024) { kina[i] = 93; i = i + 1; }
     kina[1024] = 0;
     Json* d512 = json_changanua(kina, &k);
     thibitisha_si_tupu(d512, "kina 512 kinakubaliwa");
-    N32 kina_halisi = 0;
+    n32 kina_halisi = 0;
     Json* sasa = d512;
     wakati (json_aina(sasa) == JSON_ORODHA && json_urefu(sasa) == 1) {
         sasa = json_kipengele(sasa, 0);
@@ -136,7 +136,7 @@ N32 main() {
     }
     thibitisha_n32(kina_halisi, 511, "kina 512: orodha 511 zimeundwa ndani ya moja");
 
-    N8* kina2 = tenga(4096);
+    n8* kina2 = tenga(4096);
     i = 0;
     wakati (i < 513) { kina2[i] = 91; i = i + 1; }
     wakati (i < 1026) { kina2[i] = 93; i = i + 1; }
@@ -147,8 +147,8 @@ N32 main() {
     thibitisha_mfuatano(k.ujumbe, "kina cha nesting kimezidi kikomo (512)", "kina 513: ujumbe");
 
     // Kina cha vitu (kitu ndani ya kitu ndani ya ...)
-    N8* vk = tenga(8192);
-    N32 w = 0;
+    n8* vk = tenga(8192);
+    n32 w = 0;
     i = 0;
     wakati (i < 513) {
         vk[w] = 123; vk[w + 1] = 34; vk[w + 2] = 97; vk[w + 3] = 34; vk[w + 4] = 58;  // {"a":

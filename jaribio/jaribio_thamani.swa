@@ -1,6 +1,6 @@
 // jaribio_thamani.swa -- uwakilishi wa thamani, vijenzi na vifikiaji.
 
-N32 main() {
+n32 main() {
     Json* n = json_null();
     thibitisha_n32(json_aina(n), JSON_NULL, "null: aina");
 
@@ -13,7 +13,7 @@ N32 main() {
     thibitisha_n32(json_aina(x), JSON_NAMBARI, "nambari: aina");
     thibitisha(json_thamani_nambari(x) == 2.5, "nambari: thamani 2.5");
 
-    N8* asili = "habari";
+    n8* asili = "habari";
     Json* s = json_mfuatano(asili);
     thibitisha_mfuatano(json_thamani_mfuatano(s), "habari", "mfuatano: thamani");
     thibitisha_n32(json_urefu(s), 6, "mfuatano: urefu");
@@ -21,7 +21,7 @@ N32 main() {
 
     // Orodha inayokua zaidi ya uwezo wa awali (4) -- vipengele 100.
     Json* o = json_orodha();
-    N32 i = 0;
+    n32 i = 0;
     wakati (i < 100) {
         thibitisha(json_orodha_ongeza(o, json_nambari(i * 1.0)) == 1, "orodha: ongeza");
         i = i + 1;
@@ -49,7 +49,7 @@ N32 main() {
     thibitisha_tupu(json_pata(o, "a"), "pata kwa aina isiyo kitu");
 
     Json* kubwa = json_kitu();
-    N8 jina[16];
+    n8 jina[16];
     i = 0;
     wakati (i < 50) {
         jina[0] = 107;  // 'k'

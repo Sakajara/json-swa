@@ -3,12 +3,12 @@
 //
 // Ujenzi: SWA=/njia/ya/swa ./jenga.sh mfano/matumizi.swa matumizi
 
-N32 main() {
+n32 main() {
     // 1. Changanua maandishi ya JSON.
     JsonKosa kosa;
     Json* v = json_changanua("{\"jina\": \"Amina\", \"umri\": 27, \"lugha\": [\"Kiswahili\", \"Swa\"]}", &kosa);
     kama (v == 0) {
-        N8 ujumbe[512];
+        n8 ujumbe[512];
         json_ujumbe_wa_kosa(&kosa, ujumbe, 512);
         andika_stderr("%s\n", ujumbe, 0, 0, 0, 0, 0);
         rudisha 1;
@@ -16,7 +16,7 @@ N32 main() {
 
     // 2. Soma sehemu.
     andika("jina  = %s\n", json_thamani_mfuatano(json_pata(v, "jina")), 0, 0, 0, 0, 0);
-    N32 umri = json_thamani_nambari(json_pata(v, "umri"));
+    n32 umri = json_thamani_nambari(json_pata(v, "umri"));
     andika("umri  = %d\n", umri, 0, 0, 0, 0, 0);
     Json* lugha = json_pata(v, "lugha");
     andika("lugha = %d (kwanza: %s)\n", json_urefu(lugha), json_thamani_mfuatano(json_kipengele(lugha, 0)), 0, 0, 0);

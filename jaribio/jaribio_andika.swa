@@ -1,7 +1,7 @@
 // jaribio_andika.swa -- kiandikaji: compact, pretty, escape, nambari.
 
 // Changanua `ingizo` kisha liandike compact na ulinganishe.
-W0 dhibitisha_compact(N8* ingizo, N8* tarajiwa, N8* jina) {
+w0 dhibitisha_compact(n8* ingizo, n8* tarajiwa, n8* jina) {
     JsonKosa kosa;
     Json* v = json_changanua(ingizo, &kosa);
     thibitisha_si_tupu(v, jina);
@@ -11,12 +11,12 @@ W0 dhibitisha_compact(N8* ingizo, N8* tarajiwa, N8* jina) {
 }
 
 // Panga nambari iliyojengwa (bila maandishi asili).
-W0 dhibitisha_nambari(D64 x, N8* tarajiwa, N8* jina) {
+w0 dhibitisha_nambari(d64 x, n8* tarajiwa, n8* jina) {
     Json* n = json_nambari(x);
     thibitisha_mfuatano(json_hadi_mfuatano(n), tarajiwa, jina);
 }
 
-N32 main() {
+n32 main() {
     // ---- Compact: aina zote ----
     dhibitisha_compact("null", "null", "compact: null");
     dhibitisha_compact(" true ", "true", "compact: true");
@@ -37,8 +37,8 @@ N32 main() {
     dhibitisha_compact("\"a\\\"b\\\\c\\/d\\be\\ff\\ng\\rh\\ti\"", "\"a\\\"b\\\\c/d\\be\\ff\\ng\\rh\\ti\"", "escape: \\/ inakuwa /");
     // (Swa haina \xNN kwenye herufi halisi -- baiti zinatengenezwa kwa mkono.)
     // Towe la "\u0001\u001f\u007f": udhibiti unakuwa \u00XX, DEL (0x7f) inabaki ghafi.
-    N8 e1[24];
-    N32 k = 0;
+    n8 e1[24];
+    n32 k = 0;
     e1[k] = 34; k = k + 1;
     e1[k] = 92; k = k + 1; e1[k] = 117; k = k + 1; e1[k] = 48; k = k + 1; e1[k] = 48; k = k + 1; e1[k] = 48; k = k + 1; e1[k] = 49; k = k + 1;
     e1[k] = 92; k = k + 1; e1[k] = 117; k = k + 1; e1[k] = 48; k = k + 1; e1[k] = 48; k = k + 1; e1[k] = 49; k = k + 1; e1[k] = 102; k = k + 1;
@@ -47,7 +47,7 @@ N32 main() {
     e1[k] = 0;
     dhibitisha_compact("\"\\u0001\\u001f\\u007f\"", e1, "escape: udhibiti unakuwa \\u00XX (DEL inabaki ghafi)");
     // Towe la "\u0041\u00e9\u20AC": UTF-8 ghafi = A, C3 A9, E2 82 AC.
-    N8 e2[16];
+    n8 e2[16];
     e2[0] = 34; e2[1] = 65; e2[2] = 195; e2[3] = 169; e2[4] = 226; e2[5] = 130; e2[6] = 172; e2[7] = 34; e2[8] = 0;
     dhibitisha_compact("\"\\u0041\\u00e9\\u20AC\"", e2, "unicode: UTF-8 ghafi kwenye towe");
 
@@ -108,8 +108,8 @@ N32 main() {
         "kujenga: kitu kilichojengwa kwa programu");
 
     // ---- Kina kirefu cha kuandika (512) ----
-    N8* kina = tenga(4096);
-    N32 i = 0;
+    n8* kina = tenga(4096);
+    n32 i = 0;
     wakati (i < 512) { kina[i] = 91; i = i + 1; }
     wakati (i < 1024) { kina[i] = 93; i = i + 1; }
     kina[1024] = 0;
@@ -117,7 +117,7 @@ N32 main() {
     thibitisha_mfuatano(json_hadi_mfuatano(dk), kina, "kina 512: andika tena sawa");
 
     // ---- Bafa kubwa: mfuatano mrefu unakuza bafa ----
-    N8* refu = tenga(20000);
+    n8* refu = tenga(20000);
     i = 0;
     refu[0] = 34;
     wakati (i < 15000) { refu[i + 1] = 97 + (i % 26); i = i + 1; }
